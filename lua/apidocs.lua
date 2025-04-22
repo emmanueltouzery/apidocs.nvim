@@ -1,4 +1,6 @@
 local function apidocs_install()
+  local data_folder = vim.fn.stdpath("data") .. "/apidocs-data/"
+
   vim.system({"curl", "-L", "https://devdocs.io/docs.json"}, {text=true}, vim.schedule_wrap(function(res)
     local data = vim.fn.json_decode(res.stdout)
     local slugs_to_mtimes = {}
@@ -11,6 +13,14 @@ local function apidocs_install()
       vim.notify("Fetching documentation for " .. choice)
       if choice == nil then
         return
+      end
+      vim.fn.mkdir(data_folder, "p")
+      local elinks_conf_path = data_folder .. "elinks.conf"
+      if vim.fn.filereadable(elinks_conf_path) ~= 1 then
+        local file = io.open(elinks_conf_path, "w")
+        -- nice table borders
+        file:write("set terminal._template_.type = 2\n")
+        file:close()
       end
       local start_install = vim.loop.hrtime()
       local mtime = slugs_to_mtimes[choice]
@@ -37,7 +47,7 @@ local function apidocs_install()
 
         vim.system({"curl", "-L", "https://documents.devdocs.io/" .. choice .. "/db.json?" .. mtime}, {text=true}, vim.schedule_wrap(function(res)
           local data = vim.fn.json_decode(res.stdout)
-          local target_path = vim.fn.stdpath("data") .. "/devdocs-data/" .. choice
+          local target_path = data_folder .. choice
           vim.system({"sh", "-c", "rm -Rf " .. target_path}):wait()
           vim.fn.mkdir(target_path, "p")
           local name_and_id_to_pos = {}
@@ -57,30 +67,28 @@ local function apidocs_install()
           for _, key in ipairs(vim.tbl_keys(data)) do
             local sanitized_key = ((path_to_name[key] or key) .. "#" .. key):gsub("/", "_")
             local file = io.open(target_path .. "/" .. sanitized_key  .. ".html", "w")
-            local contents1 = data[key]:gsub("<pre [^<>]*data%-language=\"(%w+)\">", "<pre>\n```%1\n")
-            local contents2 = contents1:gsub("</pre>", "\n```\n</pre>")
-            local contents3 = contents2:gsub("<td class=.font%-monospace.>([^<]+)</td>", "<td>`%1`</td>")
-            local contents4 = contents3:gsub("<code>([^<]+)</code>", "<code>`%1`</code>")
-            if choice == "openjdk~8" then
-              contents4 = contents4:gsub("</tr>", [[<tr><td colspan="2"><hr/></td></tr>]])
-            end
-            file:write(contents4)
+            contents = data[key]:gsub("<pre [^<>]*data%-language=\"(%w+)\">", "<pre>\n```%1\n")
+            contents = contents:gsub("</pre>", "\n```\n</pre>")
+            contents = contents:gsub("<td class=.font%-monospace.>([^<]+)</td>", "<td>`%1`</td>")
+            contents = contents:gsub("<code>([^<]+)</code>", "<code>`%1`</code>")
+            contents = contents:gsub("<table", "<table border=\"1\"")
+            file:write(contents)
             file:close()
 
             local start_parse = vim.loop.hrtime()
-            local parser = vim.treesitter.get_string_parser(contents4, "html")
+            local parser = vim.treesitter.get_string_parser(contents, "html")
             local tree = parser:parse()[1]
             local elapsed = (vim.loop.hrtime() - start_parse) / 1e9
             all_parsing = all_parsing + elapsed
 
-            name_to_contents[sanitized_key] = contents4
+            name_to_contents[sanitized_key] = contents
             name_and_id_to_pos[sanitized_key] = {}
-            name_known_byte_offsets[sanitized_key] = {#contents4}
+            name_known_byte_offsets[sanitized_key] = {#contents}
 
             local start_ids = vim.loop.hrtime()
             if known_keys_per_path[key] ~= nil then
-              for id, node, metadata in query:iter_captures(tree:root(), contents4) do
-                id_val = vim.treesitter.get_node_text(node:next_named_sibling():named_child(), contents4)
+              for id, node, metadata in query:iter_captures(tree:root(), contents) do
+                id_val = vim.treesitter.get_node_text(node:next_named_sibling():named_child(), contents)
                 if known_keys_per_path[key][id_val] then
                   _, _, byte_pos = node:parent():parent():start()
                   name_and_id_to_pos[sanitized_key][id_val] = byte_pos
@@ -129,7 +137,7 @@ local function apidocs_install()
           -- convert the html to text, on 8 processes concurrently (-P8)
           vim.system({
             "sh", "-c",
-            [[find . -maxdepth 1 -name '*.html' -print0 | xargs -0 -P 8 -I param sh -c "elinks -dump 'param' > 'param'.md"]]
+            [[find . -maxdepth 1 -name '*.html' -print0 | xargs -0 -P 8 -I param sh -c "elinks -config-dir ]] .. data_folder .. [[ -dump 'param' > 'param'.md"]]
           }, {cwd=target_path}):wait()
           local elapsed_elinks = (vim.loop.hrtime() - start_elinks) / 1e9
           local elapsed = (vim.loop.hrtime() - start_install) / 1e9
@@ -141,7 +149,7 @@ local function apidocs_install()
 end
 
 local function apidocs_open()
-  local docs_path = vim.fn.stdpath("data") .. "/devdocs-data/"
+  local docs_path = vim.fn.stdpath("data") .. "/apidocs-data/"
   local fs = vim.uv.fs_scandir(docs_path)
   local candidates = {}
   while true do
@@ -185,7 +193,7 @@ local function apidocs_open()
       setup = function(self)
         vim.schedule(function()
           local winid = self.state.winid
-          vim.wo[winid].conceallevel = 3
+          vim.wo[winid].conceallevel = 1 -- if we set to 3, table borders don't line up anymore
           vim.wo[winid].concealcursor = "n"
         end)
         return {}
