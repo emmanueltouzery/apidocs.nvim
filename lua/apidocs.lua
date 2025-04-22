@@ -9,6 +9,9 @@ local function apidocs_install()
     table.sort(keys)
     vim.ui.select(keys, {prompt="Pick a documentation to install"}, function(choice)
       vim.notify("Fetching documentation for " .. choice)
+      if choice == nil then
+        return
+      end
       local start_install = vim.loop.hrtime()
       local mtime = slugs_to_mtimes[choice]
       vim.system({"curl", "-L", "https://documents.devdocs.io/" .. choice .. "/index.json?" .. mtime}, {text=true}, vim.schedule_wrap(function(res)
