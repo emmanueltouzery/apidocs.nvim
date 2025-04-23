@@ -1,3 +1,64 @@
+-- if the line contains table cells it's sensitive to alignment...
+-- in that case compensate the neovim conceal that hides the ` characters
+-- by adding extra spaces not to break the table borders alignment.
+-- the ``` check.. unlikely a line has both ` and ```, lua regexes are
+-- painful and i don't want to break ``` patterns adding spaces.
+local function add_spaces_to_compensate_conceals_cols(lines)
+  local query = vim.treesitter.query.parse('markdown_inline', [[[
+    (code_span_delimiter) (emphasis_delimiter)
+    (full_reference_link
+      [
+        "["
+        "]"
+      ])
+     (shortcut_link
+       [
+         "["
+         "]"
+       ])
+     (collapsed_reference_link
+       [
+         "["
+         "]"
+       ])
+     (inline_link
+       [
+         "["
+         "]"
+         "("
+         (link_destination)
+         ")"
+       ])
+      (image
+        [
+          "!"
+          "["
+          "]"
+          "("
+          (link_destination)
+          ")"
+        ])
+    ] @concealed]])
+
+  local lines_str = vim.fn.join(lines, "\n")
+  local parser = vim.treesitter.get_string_parser(lines_str, "markdown_inline")
+  local tree = parser:parse()[1]
+
+  local pos_to_insert = {}
+  for id, node, metadata in query:iter_captures(tree:root(), lines) do
+    local row, col, bytes = node:start()
+    if lines[row+1]:match("│") then
+      table.insert(pos_to_insert, {row, col, bytes})
+    end
+  end
+  for i = #pos_to_insert, 1, -1 do
+    local row, col, bytes = unpack(pos_to_insert[i])
+    lines[row+1] = lines[row+1]:sub(1, col) .. " " .. lines[row+1]:sub(col+1)
+  end
+
+  return lines
+end
+
 local function apidocs_install()
   local data_folder = vim.fn.stdpath("data") .. "/apidocs-data/"
 
@@ -142,73 +203,33 @@ local function apidocs_install()
             [[find . -maxdepth 1 -name '*.html' -print0 | xargs -0 -P 8 -I param sh -c "elinks -config-dir ]] .. data_folder .. [[ -dump 'param' > 'param'.md"]]
           }, {cwd=target_path}):wait()
           local elapsed_elinks = (vim.loop.hrtime() - start_elinks) / 1e9
+
+          local start_pp = vim.loop.hrtime()
+          vim.system({"rm", "*.html"}, {cwd=target_path}):wait()
+
+          -- unfortunately i must post-process the markdown to fix conceal table alignment..
+          vim.system({"rg", "-l", "│"}, {cwd=target_path}, vim.schedule_wrap(function(res)
+            for _, fname in ipairs(vim.fn.split(res.stdout, "\n")) do
+              local filepath = target_path .. "/" .. fname
+              local lines = {}
+              for line in io.lines(filepath) do
+                table.insert(lines, line)
+              end
+              local file = io.open(filepath, "w")
+              file:write(vim.fn.join(add_spaces_to_compensate_conceals_cols(lines), "\n"))
+              file:close()
+            end
+          end)):wait()
+          local elapsed_pp = (vim.loop.hrtime() - start_pp) / 1e9
+
           local elapsed = (vim.loop.hrtime() - start_install) / 1e9
-          vim.notify("Finished fetching documentation for " .. choice .. " in " .. elapsed .. "s. All parsing: " .. all_parsing .. "s. All reading IDs: " .. all_reading_ids .. "s. All writing: " .. elapsed_writing .. "s. All elinks: " .. elapsed_elinks .. "s.")
+
+          vim.notify("Finished fetching documentation for " .. choice .. " in " .. elapsed .. "s. All parsing: " .. all_parsing
+            .. "s. All reading IDs: " .. all_reading_ids .. "s. All writing: " .. elapsed_writing .. "s. All elinks: " .. elapsed_elinks .. "s. All post-process: " .. elapsed_pp .. "s.")
         end))
       end))
     end)
   end))
-end
-
--- if the line contains table cells it's sensitive to alignment...
--- in that case compensate the neovim conceal that hides the ` characters
--- by adding extra spaces not to break the table borders alignment.
--- the ``` check.. unlikely a line has both ` and ```, lua regexes are
--- painful and i don't want to break ``` patterns adding spaces.
-local function add_spaces_to_compensate_conceals_cols(lines)
-  local query = vim.treesitter.query.parse('markdown_inline', [[[
-    (code_span_delimiter) (emphasis_delimiter)
-    (full_reference_link
-      [
-        "["
-        "]"
-      ])
-     (shortcut_link
-       [
-         "["
-         "]"
-       ])
-     (collapsed_reference_link
-       [
-         "["
-         "]"
-       ])
-     (inline_link
-       [
-         "["
-         "]"
-         "("
-         (link_destination)
-         ")"
-       ])
-      (image
-        [
-          "!"
-          "["
-          "]"
-          "("
-          (link_destination)
-          ")"
-        ])
-    ] @concealed]])
-
-  local lines_str = vim.fn.join(lines, "\n")
-  local parser = vim.treesitter.get_string_parser(lines_str, "markdown_inline")
-  local tree = parser:parse()[1]
-
-  local pos_to_insert = {}
-  for id, node, metadata in query:iter_captures(tree:root(), lines) do
-    local row, col, bytes = node:start()
-    if lines[row+1]:match("│") then
-      table.insert(pos_to_insert, {row, col, bytes})
-    end
-  end
-  for i = #pos_to_insert, 1, -1 do
-    local row, col, bytes = unpack(pos_to_insert[i])
-    lines[row+1] = lines[row+1]:sub(1, col) .. " " .. lines[row+1]:sub(col+1)
-  end
-
-  return lines
 end
 
 local function apidocs_open()
@@ -269,7 +290,7 @@ local function apidocs_open()
             -- nbsp so that neovim doesn't highlight this as a quoted paragraph
             table.insert(lines, (line:gsub("^    ", "    ")))
           end
-          vim.api.nvim_buf_set_lines(self.state.bufnr, 0, -1, false, (add_spaces_to_compensate_conceals_cols(lines)))
+          vim.api.nvim_buf_set_lines(self.state.bufnr, 0, -1, false, lines)
 
           vim.bo[self.state.bufnr].filetype = "markdown"
         else
