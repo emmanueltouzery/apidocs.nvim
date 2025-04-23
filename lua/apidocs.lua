@@ -71,7 +71,8 @@ local function apidocs_install()
               :gsub("<pre [^<>]*data%-language=\"(%w+)\">", "<pre>\n```%1\n")
               :gsub("</pre>", "\n```\n</pre>")
               :gsub("<td class=.font%-monospace.>([^<]+)</td>", "<td>`%1`</td>")
-              :gsub("<code>([^<]+)</code>", "<code>`%1`</code>")
+              :gsub("<code>([^<\n]+)</code>", "<code>`%1`</code>")
+              :gsub("<code>([^`][^<]+)</code>", "<code>```\n%1\n```</code>")
               :gsub("<table", "<table border=\"1\"")
             file:write(contents)
             file:close()
@@ -149,6 +150,67 @@ local function apidocs_install()
   end))
 end
 
+-- if the line contains table cells it's sensitive to alignment...
+-- in that case compensate the neovim conceal that hides the ` characters
+-- by adding extra spaces not to break the table borders alignment.
+-- the ``` check.. unlikely a line has both ` and ```, lua regexes are
+-- painful and i don't want to break ``` patterns adding spaces.
+local function add_spaces_to_compensate_conceals_cols(lines)
+  local query = vim.treesitter.query.parse('markdown_inline', [[[
+    (code_span_delimiter) (emphasis_delimiter)
+    (full_reference_link
+      [
+        "["
+        "]"
+      ])
+     (shortcut_link
+       [
+         "["
+         "]"
+       ])
+     (collapsed_reference_link
+       [
+         "["
+         "]"
+       ])
+     (inline_link
+       [
+         "["
+         "]"
+         "("
+         (link_destination)
+         ")"
+       ])
+      (image
+        [
+          "!"
+          "["
+          "]"
+          "("
+          (link_destination)
+          ")"
+        ])
+    ] @concealed]])
+
+  local lines_str = vim.fn.join(lines, "\n")
+  local parser = vim.treesitter.get_string_parser(lines_str, "markdown_inline")
+  local tree = parser:parse()[1]
+
+  local pos_to_insert = {}
+  for id, node, metadata in query:iter_captures(tree:root(), lines) do
+    local row, col, bytes = node:start()
+    if lines[row+1]:match("│") then
+      table.insert(pos_to_insert, {row, col, bytes})
+    end
+  end
+  for i = #pos_to_insert, 1, -1 do
+    local row, col, bytes = unpack(pos_to_insert[i])
+    lines[row+1] = lines[row+1]:sub(1, col) .. " " .. lines[row+1]:sub(col+1)
+  end
+
+  return lines
+end
+
 local function apidocs_open()
   local docs_path = vim.fn.stdpath("data") .. "/apidocs-data/"
   local fs = vim.uv.fs_scandir(docs_path)
@@ -204,28 +266,10 @@ local function apidocs_open()
         if vim.fn.filereadable(filepath) == 1 then
           local lines = {}
           for line in io.lines(filepath) do
-            -- if the line contains table cells it's sensitive to alignment...
-            -- in that case compensate the neovim conceal that hides the ` characters
-            -- by adding extra spaces not to break the table borders alignment.
-            -- the ``` check.. unlikely a line has both ` and ```, lua regexes are
-            -- painful and i don't want to break ``` patterns adding spaces.
-            if line:match("│") and not line:match("```") then
-              counter = 0
-              table.insert(lines, (line:gsub("`", function()
-                if counter % 2 == 0 then
-                  return " `"
-                else
-                  return "` "
-                end
-                counter = counter + 1
-              -- nbsp so that neovim doesn't highlight this as a quoted paragraph
-              end):gsub("^    ", "    ")))
-            else
-              -- nbsp so that neovim doesn't highlight this as a quoted paragraph
-              table.insert(lines, (line:gsub("^    ", "    ")))
-            end
+            -- nbsp so that neovim doesn't highlight this as a quoted paragraph
+            table.insert(lines, (line:gsub("^    ", "    ")))
           end
-          vim.api.nvim_buf_set_lines(self.state.bufnr, 0, -1, false, lines)
+          vim.api.nvim_buf_set_lines(self.state.bufnr, 0, -1, false, (add_spaces_to_compensate_conceals_cols(lines)))
 
           vim.bo[self.state.bufnr].filetype = "markdown"
         else
