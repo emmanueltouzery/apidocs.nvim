@@ -67,11 +67,12 @@ local function apidocs_install()
           for _, key in ipairs(vim.tbl_keys(data)) do
             local sanitized_key = ((path_to_name[key] or key) .. "#" .. key):gsub("/", "_")
             local file = io.open(target_path .. "/" .. sanitized_key  .. ".html", "w")
-            contents = data[key]:gsub("<pre [^<>]*data%-language=\"(%w+)\">", "<pre>\n```%1\n")
-            contents = contents:gsub("</pre>", "\n```\n</pre>")
-            contents = contents:gsub("<td class=.font%-monospace.>([^<]+)</td>", "<td>`%1`</td>")
-            contents = contents:gsub("<code>([^<]+)</code>", "<code>`%1`</code>")
-            contents = contents:gsub("<table", "<table border=\"1\"")
+            contents = data[key]
+              :gsub("<pre [^<>]*data%-language=\"(%w+)\">", "<pre>\n```%1\n")
+              :gsub("</pre>", "\n```\n</pre>")
+              :gsub("<td class=.font%-monospace.>([^<]+)</td>", "<td>`%1`</td>")
+              :gsub("<code>([^<]+)</code>", "<code>`%1`</code>")
+              :gsub("<table", "<table border=\"1\"")
             file:write(contents)
             file:close()
 
@@ -193,7 +194,7 @@ local function apidocs_open()
       setup = function(self)
         vim.schedule(function()
           local winid = self.state.winid
-          vim.wo[winid].conceallevel = 1 -- if we set to 3, table borders don't line up anymore
+          vim.wo[winid].conceallevel = 2
           vim.wo[winid].concealcursor = "n"
         end)
         return {}
@@ -203,7 +204,26 @@ local function apidocs_open()
         if vim.fn.filereadable(filepath) == 1 then
           local lines = {}
           for line in io.lines(filepath) do
-            table.insert(lines, line)
+            -- if the line contains table cells it's sensitive to alignment...
+            -- in that case compensate the neovim conceal that hides the ` characters
+            -- by adding extra spaces not to break the table borders alignment.
+            -- the ``` check.. unlikely a line has both ` and ```, lua regexes are
+            -- painful and i don't want to break ``` patterns adding spaces.
+            if line:match("│") and not line:match("```") then
+              counter = 0
+              table.insert(lines, (line:gsub("`", function()
+                if counter % 2 == 0 then
+                  return " `"
+                else
+                  return "` "
+                end
+                counter = counter + 1
+              -- nbsp so that neovim doesn't highlight this as a quoted paragraph
+              end):gsub("^    ", "    ")))
+            else
+              -- nbsp so that neovim doesn't highlight this as a quoted paragraph
+              table.insert(lines, (line:gsub("^    ", "    ")))
+            end
           end
           vim.api.nvim_buf_set_lines(self.state.bufnr, 0, -1, false, lines)
 
