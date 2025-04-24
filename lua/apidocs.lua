@@ -313,10 +313,14 @@ local function apidocs_open()
         local buf = vim.api.nvim_create_buf(true, false)
         vim.api.nvim_win_set_buf(0, buf)
         local docs_path = require("telescope.actions.state").get_selected_entry(prompt_bufnr).value
+        vim.wo.conceallevel = 2
+        vim.wo.concealcursor = "n"
+        vim.wo.winfixbuf = true
+        vim.wo.list = false
         load_doc_in_buffer(buf, docs_path)
-        vim.wo[0].conceallevel = 2
-        vim.wo[0].concealcursor = "n"
-        vim.wo[0].winfixbuf = true
+        vim.api.nvim_buf_set_option(0, 'modifiable', false)
+        vim.wo.wrap = false
+        vim.bo.modified = false
       end)
       return true
     end,
