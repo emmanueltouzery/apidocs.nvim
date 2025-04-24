@@ -129,11 +129,27 @@ local function apidocs_install()
             local sanitized_key = ((path_to_name[key] or key) .. "#" .. key):gsub("/", "_")
             local file = io.open(target_path .. "/" .. sanitized_key  .. ".html", "w")
             contents = data[key]
-              :gsub("<pre [^<>]*data%-language=\"(%w+)\">", "<pre>\n```%1\n")
-              :gsub("</pre>", "\n```\n</pre>")
+              :gsub("<pre([^>]*)>([^`][^<]+)</pre>", function(pre_attrs, children)
+                local match = pre_attrs:match("[^<>]*data%-language=\"(%w+)\"")
+                if match then
+                  return "<pre>\n```" .. match .. "\n" .. children .. "\n```</pre>"
+                elseif not children:match("<code") then
+                  return "<pre" ..pre_attrs .. ">\n```\n" .. children .. "\n```</pre>"
+                else
+                  -- sometimes there is <pre><code></code></pre>. don't add double ```, let <code> handle it
+                  return "<pre" .. pre_attrs .. ">" .. children .. "</pre>"
+                end
+              end)
               :gsub("<td class=.font%-monospace.>([^<]+)</td>", "<td>`%1`</td>")
-              :gsub("<code>([^<\n]+)</code>", "<code>`%1`</code>")
-              :gsub("<code>([^`][^<]+)</code>", "<code>```\n%1\n```</code>")
+              :gsub("<code([^>]*)>([^<\n]+)</code>", "<code%1>`%2`</code>")
+              :gsub("<code([^>]*)>([^`][^<]+)</code>", function(code_attrs, children)
+                local match = code_attrs:match("class=\"javascript\"")
+                if match then
+                  return "<code" .. code_attrs .. ">\n```javascript\n" .. children .. "\n```</code>"
+                else
+                  return "<code" .. code_attrs .. ">\n```\n" .. children .. "\n```</code>"
+                end
+              end)
               :gsub("<table", "<table border=\"1\"")
             file:write(contents)
             file:close()
