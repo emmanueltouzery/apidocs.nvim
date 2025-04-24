@@ -59,193 +59,210 @@ local function add_spaces_to_compensate_conceals_cols(lines)
   return lines
 end
 
-local function apidocs_install()
-  local data_folder = vim.fn.stdpath("data") .. "/apidocs-data/"
+local function data_folder()
+  return vim.fn.stdpath("data") .. "/apidocs-data/"
+end
 
+local function apidoc_install(choice, slugs_to_mtimes, cont)
+  vim.notify("Fetching documentation for " .. choice)
+  local data_folder = data_folder()
+  vim.fn.mkdir(data_folder, "p")
+  local elinks_conf_path = data_folder .. "elinks.conf"
+  if vim.fn.filereadable(elinks_conf_path) ~= 1 then
+    local file = io.open(elinks_conf_path, "w")
+    -- nice table borders
+    file:write("set terminal._template_.type = 2\n")
+    file:close()
+  end
+  local start_install = vim.loop.hrtime()
+  local mtime = slugs_to_mtimes[choice]
+  vim.system({"curl", "-L", "https://documents.devdocs.io/" .. choice .. "/index.json?" .. mtime}, {text=true}, vim.schedule_wrap(function(res)
+    local data = vim.fn.json_decode(res.stdout)
+    local name_to_path = {}
+    local path_to_name = {}
+    local known_keys_per_path = {}
+    for _, entry in ipairs(data["entries"]) do
+      name_to_path[entry.name] = entry.path
+      path_to_name[entry.path] = entry.name
+
+      local file_id = vim.split(entry.path, "#")
+      if #file_id == 2 then
+        path_to_name[entry.path] = entry.name
+        local sanitized_fname = file_id[1]:gsub("/", "_")
+        if known_keys_per_path[file_id[1]] == nil then
+          known_keys_per_path[file_id[1]] = {[file_id[2]] = true}
+        else
+          known_keys_per_path[file_id[1]][file_id[2]] = true
+        end
+      end
+    end
+
+    vim.system({"curl", "-L", "https://documents.devdocs.io/" .. choice .. "/db.json?" .. mtime}, {text=true}, vim.schedule_wrap(function(res)
+      local data = vim.fn.json_decode(res.stdout)
+      local target_path = data_folder .. choice
+      vim.system({"sh", "-c", "rm -Rf " .. target_path}):wait()
+      vim.fn.mkdir(target_path, "p")
+      local name_and_id_to_pos = {}
+      local name_known_byte_offsets = {}
+      local name_to_contents = {}
+
+      local query = vim.treesitter.query.parse('html', [[
+      (attribute
+      (attribute_name) @_name
+      (#eq? @_name "id")
+    )
+    ]])
+    all_parsing = 0
+    all_reading_ids = 0
+
+    -- save all the files
+    for _, key in ipairs(vim.tbl_keys(data)) do
+      local sanitized_key = ((path_to_name[key] or key) .. "#" .. key):gsub("/", "_")
+      local file = io.open(target_path .. "/" .. sanitized_key  .. ".html", "w")
+      contents = data[key]
+      :gsub("<pre([^>]*)>([^`][^<]+)</pre>", function(pre_attrs, children)
+        local match = pre_attrs:match("[^<>]*data%-language=\"(%w+)\"")
+        if match then
+          return "<pre>\n```" .. match .. "\n" .. children .. "\n```</pre>"
+        elseif not children:match("<code") then
+          return "<pre" ..pre_attrs .. ">\n```\n" .. children .. "\n```</pre>"
+        else
+          -- sometimes there is <pre><code></code></pre>. don't add double ```, let <code> handle it
+          return "<pre" .. pre_attrs .. ">" .. children .. "</pre>"
+        end
+      end)
+      :gsub("<td class=.font%-monospace.>([^<]+)</td>", "<td>`%1`</td>")
+      :gsub("<code([^>]*)>([^<\n]+)</code>", "<code%1>`%2`</code>")
+      :gsub("<code([^>]*)>([^`][^<]+)</code>", function(code_attrs, children)
+        local match = code_attrs:match("class=\"javascript\"")
+        if match then
+          return "<code" .. code_attrs .. ">\n```javascript\n" .. children .. "\n```</code>"
+        else
+          return "<code" .. code_attrs .. ">\n```\n" .. children .. "\n```</code>"
+        end
+      end)
+      :gsub("<table", "<table border=\"1\"")
+      file:write(contents)
+      file:close()
+
+      local start_parse = vim.loop.hrtime()
+      local parser = vim.treesitter.get_string_parser(contents, "html")
+      local tree = parser:parse()[1]
+      local elapsed = (vim.loop.hrtime() - start_parse) / 1e9
+      all_parsing = all_parsing + elapsed
+
+      name_to_contents[sanitized_key] = contents
+      name_and_id_to_pos[sanitized_key] = {}
+      name_known_byte_offsets[sanitized_key] = {#contents}
+
+      local start_ids = vim.loop.hrtime()
+      if known_keys_per_path[key] ~= nil then
+        for id, node, metadata in query:iter_captures(tree:root(), contents) do
+          id_val = vim.treesitter.get_node_text(node:next_named_sibling():named_child(), contents)
+          if known_keys_per_path[key][id_val] then
+            _, _, byte_pos = node:parent():parent():start()
+            name_and_id_to_pos[sanitized_key][id_val] = byte_pos
+            table.insert(name_known_byte_offsets[sanitized_key], byte_pos)
+          end
+        end
+      end
+      all_reading_ids = all_reading_ids + elapsed
+
+      -- need to sort offsets, later i search for the byte offset after my current one
+      -- to know where to stop when extracting docs from a larger file
+      table.sort(name_known_byte_offsets[sanitized_key])
+    end
+
+    -- now extract all the entries to non-html files
+    local start_writing = vim.loop.hrtime()
+    for name, path in pairs(name_to_path) do
+      local file_id = vim.split(path, "#")
+      local sanitized_containing_file_name = ((path_to_name[file_id[1]] or file_id[1]) .. "#" .. file_id[1]):gsub("/", "_")
+      local sanitized_fname = name:gsub("/", "_")
+      if #file_id == 2 then
+        local byte = name_and_id_to_pos[sanitized_containing_file_name][file_id[2]]
+        local to_write_contents = nil
+        if byte == nil then
+          -- bad id. this happens with openjdk~8, Vector.add() for instance. Behave the same
+          -- as the devdocs UI, point to the whole file since we can't delimitate the correct subpart.
+          to_write_contents = name_to_contents[sanitized_containing_file_name]
+        else
+          local next_byte = nil
+          for i,val in ipairs(name_known_byte_offsets[sanitized_containing_file_name]) do
+            if val == byte then
+              next_byte = name_known_byte_offsets[sanitized_containing_file_name][i+1]
+            end
+          end
+          to_write_contents = string.sub(name_to_contents[sanitized_containing_file_name], byte, next_byte)
+        end
+        local sanitized_name = name:gsub("/", "_")
+        local file = io.open(target_path .. "/" .. sanitized_name .. "#" .. file_id[1]:gsub("/", "_") .. ".html", "w")
+        file:write(to_write_contents)
+        file:close()
+      end
+    end
+    local elapsed_writing = (vim.loop.hrtime() - start_writing) / 1e9
+
+    local start_elinks = vim.loop.hrtime()
+    -- convert the html to text, on 8 processes concurrently (-P8)
+    vim.system({
+      "sh", "-c",
+      [[find . -maxdepth 1 -name '*.html' -print0 | xargs -0 -P 8 -I param sh -c "elinks -config-dir ]] .. data_folder .. [[ -dump 'param' > 'param'.md"]]
+    }, {cwd=target_path}):wait()
+    local elapsed_elinks = (vim.loop.hrtime() - start_elinks) / 1e9
+
+    local start_pp = vim.loop.hrtime()
+    vim.system({"rm", "*.html"}, {cwd=target_path}):wait()
+
+    -- unfortunately i must post-process the markdown to fix conceal table alignment..
+    vim.system({"rg", "-l", "│"}, {cwd=target_path}, vim.schedule_wrap(function(res)
+      for _, fname in ipairs(vim.fn.split(res.stdout, "\n")) do
+        local filepath = target_path .. "/" .. fname
+        local lines = {}
+        for line in io.lines(filepath) do
+          table.insert(lines, line)
+        end
+        local file = io.open(filepath, "w")
+        file:write(vim.fn.join(add_spaces_to_compensate_conceals_cols(lines), "\n"))
+        file:close()
+      end
+    end)):wait()
+    local elapsed_pp = (vim.loop.hrtime() - start_pp) / 1e9
+
+    local elapsed = (vim.loop.hrtime() - start_install) / 1e9
+
+    vim.notify("Finished fetching documentation for " .. choice .. " in " .. elapsed .. "s. All parsing: " .. all_parsing
+    .. "s. All reading IDs: " .. all_reading_ids .. "s. All writing: " .. elapsed_writing .. "s. All elinks: " .. elapsed_elinks .. "s. All post-process: " .. elapsed_pp .. "s.")
+
+    if cont ~= nil then
+      cont()
+    end
+  end))
+end))
+end
+
+local function fetch_slugs_and_mtimes_and_then(cont)
   vim.system({"curl", "-L", "https://devdocs.io/docs.json"}, {text=true}, vim.schedule_wrap(function(res)
     local data = vim.fn.json_decode(res.stdout)
     local slugs_to_mtimes = {}
     for _, doc in ipairs(data) do
       slugs_to_mtimes[doc['slug']] = doc['mtime']
     end
+    cont(slugs_to_mtimes)
+  end))
+end
+
+local function apidocs_install()
+  fetch_slugs_and_mtimes_and_then(function (slugs_to_mtimes)
     local keys = vim.tbl_keys(slugs_to_mtimes)
     table.sort(keys)
     vim.ui.select(keys, {prompt="Pick a documentation to install"}, function(choice)
-      vim.notify("Fetching documentation for " .. choice)
       if choice == nil then
         return
       end
-      vim.fn.mkdir(data_folder, "p")
-      local elinks_conf_path = data_folder .. "elinks.conf"
-      if vim.fn.filereadable(elinks_conf_path) ~= 1 then
-        local file = io.open(elinks_conf_path, "w")
-        -- nice table borders
-        file:write("set terminal._template_.type = 2\n")
-        file:close()
-      end
-      local start_install = vim.loop.hrtime()
-      local mtime = slugs_to_mtimes[choice]
-      vim.system({"curl", "-L", "https://documents.devdocs.io/" .. choice .. "/index.json?" .. mtime}, {text=true}, vim.schedule_wrap(function(res)
-        local data = vim.fn.json_decode(res.stdout)
-        local name_to_path = {}
-        local path_to_name = {}
-        local known_keys_per_path = {}
-        for _, entry in ipairs(data["entries"]) do
-          name_to_path[entry.name] = entry.path
-          path_to_name[entry.path] = entry.name
-
-          local file_id = vim.split(entry.path, "#")
-          if #file_id == 2 then
-            path_to_name[entry.path] = entry.name
-            local sanitized_fname = file_id[1]:gsub("/", "_")
-            if known_keys_per_path[file_id[1]] == nil then
-              known_keys_per_path[file_id[1]] = {[file_id[2]] = true}
-            else
-              known_keys_per_path[file_id[1]][file_id[2]] = true
-            end
-          end
-        end
-
-        vim.system({"curl", "-L", "https://documents.devdocs.io/" .. choice .. "/db.json?" .. mtime}, {text=true}, vim.schedule_wrap(function(res)
-          local data = vim.fn.json_decode(res.stdout)
-          local target_path = data_folder .. choice
-          vim.system({"sh", "-c", "rm -Rf " .. target_path}):wait()
-          vim.fn.mkdir(target_path, "p")
-          local name_and_id_to_pos = {}
-          local name_known_byte_offsets = {}
-          local name_to_contents = {}
-
-          local query = vim.treesitter.query.parse('html', [[
-          (attribute
-            (attribute_name) @_name
-            (#eq? @_name "id")
-          )
-          ]])
-          all_parsing = 0
-          all_reading_ids = 0
-
-          -- save all the files
-          for _, key in ipairs(vim.tbl_keys(data)) do
-            local sanitized_key = ((path_to_name[key] or key) .. "#" .. key):gsub("/", "_")
-            local file = io.open(target_path .. "/" .. sanitized_key  .. ".html", "w")
-            contents = data[key]
-              :gsub("<pre([^>]*)>([^`][^<]+)</pre>", function(pre_attrs, children)
-                local match = pre_attrs:match("[^<>]*data%-language=\"(%w+)\"")
-                if match then
-                  return "<pre>\n```" .. match .. "\n" .. children .. "\n```</pre>"
-                elseif not children:match("<code") then
-                  return "<pre" ..pre_attrs .. ">\n```\n" .. children .. "\n```</pre>"
-                else
-                  -- sometimes there is <pre><code></code></pre>. don't add double ```, let <code> handle it
-                  return "<pre" .. pre_attrs .. ">" .. children .. "</pre>"
-                end
-              end)
-              :gsub("<td class=.font%-monospace.>([^<]+)</td>", "<td>`%1`</td>")
-              :gsub("<code([^>]*)>([^<\n]+)</code>", "<code%1>`%2`</code>")
-              :gsub("<code([^>]*)>([^`][^<]+)</code>", function(code_attrs, children)
-                local match = code_attrs:match("class=\"javascript\"")
-                if match then
-                  return "<code" .. code_attrs .. ">\n```javascript\n" .. children .. "\n```</code>"
-                else
-                  return "<code" .. code_attrs .. ">\n```\n" .. children .. "\n```</code>"
-                end
-              end)
-              :gsub("<table", "<table border=\"1\"")
-            file:write(contents)
-            file:close()
-
-            local start_parse = vim.loop.hrtime()
-            local parser = vim.treesitter.get_string_parser(contents, "html")
-            local tree = parser:parse()[1]
-            local elapsed = (vim.loop.hrtime() - start_parse) / 1e9
-            all_parsing = all_parsing + elapsed
-
-            name_to_contents[sanitized_key] = contents
-            name_and_id_to_pos[sanitized_key] = {}
-            name_known_byte_offsets[sanitized_key] = {#contents}
-
-            local start_ids = vim.loop.hrtime()
-            if known_keys_per_path[key] ~= nil then
-              for id, node, metadata in query:iter_captures(tree:root(), contents) do
-                id_val = vim.treesitter.get_node_text(node:next_named_sibling():named_child(), contents)
-                if known_keys_per_path[key][id_val] then
-                  _, _, byte_pos = node:parent():parent():start()
-                  name_and_id_to_pos[sanitized_key][id_val] = byte_pos
-                  table.insert(name_known_byte_offsets[sanitized_key], byte_pos)
-                end
-              end
-            end
-            all_reading_ids = all_reading_ids + elapsed
-
-            -- need to sort offsets, later i search for the byte offset after my current one
-            -- to know where to stop when extracting docs from a larger file
-            table.sort(name_known_byte_offsets[sanitized_key])
-          end
-
-          -- now extract all the entries to non-html files
-          local start_writing = vim.loop.hrtime()
-          for name, path in pairs(name_to_path) do
-            local file_id = vim.split(path, "#")
-            local sanitized_containing_file_name = ((path_to_name[file_id[1]] or file_id[1]) .. "#" .. file_id[1]):gsub("/", "_")
-            local sanitized_fname = name:gsub("/", "_")
-            if #file_id == 2 then
-              local byte = name_and_id_to_pos[sanitized_containing_file_name][file_id[2]]
-              local to_write_contents = nil
-              if byte == nil then
-                -- bad id. this happens with openjdk~8, Vector.add() for instance. Behave the same
-                -- as the devdocs UI, point to the whole file since we can't delimitate the correct subpart.
-                to_write_contents = name_to_contents[sanitized_containing_file_name]
-              else
-                local next_byte = nil
-                for i,val in ipairs(name_known_byte_offsets[sanitized_containing_file_name]) do
-                  if val == byte then
-                    next_byte = name_known_byte_offsets[sanitized_containing_file_name][i+1]
-                  end
-                end
-                to_write_contents = string.sub(name_to_contents[sanitized_containing_file_name], byte, next_byte)
-              end
-              local sanitized_name = name:gsub("/", "_")
-              local file = io.open(target_path .. "/" .. sanitized_name .. "#" .. file_id[1]:gsub("/", "_") .. ".html", "w")
-              file:write(to_write_contents)
-              file:close()
-            end
-          end
-          local elapsed_writing = (vim.loop.hrtime() - start_writing) / 1e9
-
-          local start_elinks = vim.loop.hrtime()
-          -- convert the html to text, on 8 processes concurrently (-P8)
-          vim.system({
-            "sh", "-c",
-            [[find . -maxdepth 1 -name '*.html' -print0 | xargs -0 -P 8 -I param sh -c "elinks -config-dir ]] .. data_folder .. [[ -dump 'param' > 'param'.md"]]
-          }, {cwd=target_path}):wait()
-          local elapsed_elinks = (vim.loop.hrtime() - start_elinks) / 1e9
-
-          local start_pp = vim.loop.hrtime()
-          vim.system({"rm", "*.html"}, {cwd=target_path}):wait()
-
-          -- unfortunately i must post-process the markdown to fix conceal table alignment..
-          vim.system({"rg", "-l", "│"}, {cwd=target_path}, vim.schedule_wrap(function(res)
-            for _, fname in ipairs(vim.fn.split(res.stdout, "\n")) do
-              local filepath = target_path .. "/" .. fname
-              local lines = {}
-              for line in io.lines(filepath) do
-                table.insert(lines, line)
-              end
-              local file = io.open(filepath, "w")
-              file:write(vim.fn.join(add_spaces_to_compensate_conceals_cols(lines), "\n"))
-              file:close()
-            end
-          end)):wait()
-          local elapsed_pp = (vim.loop.hrtime() - start_pp) / 1e9
-
-          local elapsed = (vim.loop.hrtime() - start_install) / 1e9
-
-          vim.notify("Finished fetching documentation for " .. choice .. " in " .. elapsed .. "s. All parsing: " .. all_parsing
-            .. "s. All reading IDs: " .. all_reading_ids .. "s. All writing: " .. elapsed_writing .. "s. All elinks: " .. elapsed_elinks .. "s. All post-process: " .. elapsed_pp .. "s.")
-        end))
-      end))
+      apidoc_install(choice, slugs_to_mtimes)
     end)
-  end))
+  end)
 end
 
 local function load_doc_in_buffer(buf, filepath)
@@ -263,22 +280,47 @@ local function load_doc_in_buffer(buf, filepath)
   end
 end
 
-local function apidocs_open()
-  local docs_path = vim.fn.stdpath("data") .. "/apidocs-data/"
+local function apidocs_open(params, slugs_to_mtimes)
+  local docs_path = data_folder()
   local fs = vim.uv.fs_scandir(docs_path)
   local candidates = {}
+  local installed_docs = {}
   while true do
     local name, type = vim.uv.fs_scandir_next(fs)
     if not name then break end
     if type == 'directory' then
-      local fs2 = vim.uv.fs_scandir(docs_path .. "/" .. name)
-      while true do
-        local name2, type2 = vim.uv.fs_scandir_next(fs2)
-        if not name2 then break end
-        if type2 == 'file' and vim.endswith(name2, ".html.md") then
-          local name_no_txt = name2:gsub("#.*$", "")
-          table.insert(candidates, {display = name .. "/" .. name_no_txt, path = name .. "/" .. name2})
+      table.insert(installed_docs, name)
+    end
+  end
+
+  if params and params.ensure_installed then
+    for _, source in ipairs(params.ensure_installed) do
+      if not vim.tbl_contains(installed_docs, source) then
+        if slugs_to_mtimes == nil then
+          fetch_slugs_and_mtimes_and_then(function (slugs_to_mtimes)
+            apidoc_install(source, slugs_to_mtimes, function()
+              apidocs_open(params, slugs_to_mtimes)
+            end)
+          end)
+          return
+        else
+          apidoc_install(source, slugs_to_mtimes, function()
+              apidocs_open(params, slugs_to_mtimes)
+          end)
+          return
         end
+      end
+    end
+  end
+
+  for _, name in ipairs(installed_docs) do
+    local fs2 = vim.uv.fs_scandir(docs_path .. "/" .. name)
+    while true do
+      local name2, type2 = vim.uv.fs_scandir_next(fs2)
+      if not name2 then break end
+      if type2 == 'file' and vim.endswith(name2, ".html.md") then
+        local name_no_txt = name2:gsub("#.*$", "")
+        table.insert(candidates, {display = name .. "/" .. name_no_txt, path = name .. "/" .. name2})
       end
     end
   end
