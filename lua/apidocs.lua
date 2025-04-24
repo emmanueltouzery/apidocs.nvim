@@ -232,6 +232,21 @@ local function apidocs_install()
   end))
 end
 
+local function load_doc_in_buffer(buf, filepath)
+  if vim.fn.filereadable(filepath) == 1 then
+    local lines = {}
+    for line in io.lines(filepath) do
+      -- nbsp so that neovim doesn't highlight this as a quoted paragraph
+      table.insert(lines, (line:gsub("^    ", "    ")))
+    end
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+
+    vim.bo[buf].filetype = "markdown"
+  else
+    vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "File not readable: " .. filepath })
+  end
+end
+
 local function apidocs_open()
   local docs_path = vim.fn.stdpath("data") .. "/apidocs-data/"
   local fs = vim.uv.fs_scandir(docs_path)
@@ -283,23 +298,28 @@ local function apidocs_open()
         return {}
       end,
       define_preview = function(self, entry)
-        local filepath = entry.value
-        if vim.fn.filereadable(filepath) == 1 then
-          local lines = {}
-          for line in io.lines(filepath) do
-            -- nbsp so that neovim doesn't highlight this as a quoted paragraph
-            table.insert(lines, (line:gsub("^    ", "    ")))
-          end
-          vim.api.nvim_buf_set_lines(self.state.bufnr, 0, -1, false, lines)
-
-          vim.bo[self.state.bufnr].filetype = "markdown"
-        else
-          vim.api.nvim_buf_set_lines(self.state.bufnr, 0, -1, false, { "File not readable: " .. filepath })
-        end
-
+        load_doc_in_buffer(self.state.bufnr, entry.value)
       end,
     }),
     sorter = conf.generic_sorter({}),
+    attach_mappings = function(prompt_bufnr, map)
+      local actions = require('telescope.actions')
+      map('i', '<cr>', function(nr)
+        actions.close(prompt_bufnr)
+        -- create a new window and use winfixbuf on it, because i'll set
+        -- conceallevel, and that's tied to the window (not the buffer),
+        -- and is very invasive
+        vim.cmd[[100vsplit]]
+        local buf = vim.api.nvim_create_buf(true, false)
+        vim.api.nvim_win_set_buf(0, buf)
+        local docs_path = require("telescope.actions.state").get_selected_entry(prompt_bufnr).value
+        load_doc_in_buffer(buf, docs_path)
+        vim.wo[0].conceallevel = 2
+        vim.wo[0].concealcursor = "n"
+        vim.wo[0].winfixbuf = true
+      end)
+      return true
+    end,
   }):find()
 end
 
