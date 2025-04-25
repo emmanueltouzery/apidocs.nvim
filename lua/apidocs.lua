@@ -79,9 +79,11 @@ local function apidoc_install(choice, slugs_to_mtimes, cont)
   vim.system({"curl", "-L", "https://documents.devdocs.io/" .. choice .. "/index.json?" .. mtime}, {text=true}, vim.schedule_wrap(function(res)
     local data = vim.fn.json_decode(res.stdout)
     local path_to_name = {}
+    local path_to_type = {}
     local known_keys_per_path = {}
     for _, entry in ipairs(data["entries"]) do
       path_to_name[entry.path] = entry.name
+      path_to_type[entry.path] = entry.type
 
       local file_id = vim.split(entry.path, "#")
       if #file_id == 2 then
@@ -140,6 +142,9 @@ local function apidoc_install(choice, slugs_to_mtimes, cont)
         end
       end)
       :gsub("<table", "<table border=\"1\"")
+      if path_to_type[key] ~= nil then
+        file:write("> " .. path_to_type[key] .. "\n")
+      end
       file:write(contents)
       file:close()
 
@@ -195,6 +200,9 @@ local function apidoc_install(choice, slugs_to_mtimes, cont)
         end
         local sanitized_name = name:gsub("/", "_")
         local file = io.open((target_path .. "/" .. sanitized_name .. "#" .. path:gsub("/", "_")):sub(1, 250) .. ".html", "w")
+        if path_to_type[file_id[1]] ~= nil then
+          file:write("> " .. path_to_type[file_id[1]] .. "\n")
+        end
         file:write(to_write_contents)
         file:close()
       end
