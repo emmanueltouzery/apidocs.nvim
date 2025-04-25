@@ -358,6 +358,20 @@ local function apidocs_open(params, slugs_to_mtimes)
           local winid = self.state.winid
           vim.wo[winid].conceallevel = 2
           vim.wo[winid].concealcursor = "n"
+          local augroup = vim.api.nvim_create_augroup('TelescopeApiDocsResumeConceal', { clear = true })
+          vim.api.nvim_create_autocmd({"User"}, {
+            group = augroup,
+            pattern = "TelescopeResumePost",
+            callback = function()
+              local action_state = require("telescope.actions.state")
+              local current_picker = action_state.get_current_picker(vim.api.nvim_get_current_buf())
+              if current_picker.prompt_title == "API docs" then
+                local winid = current_picker.all_previewers[1].state.winid
+                vim.wo[winid].conceallevel = 2
+                vim.wo[winid].concealcursor = "n"
+              end
+            end
+          })
         end)
         return {}
       end,
