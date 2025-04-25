@@ -78,11 +78,9 @@ local function apidoc_install(choice, slugs_to_mtimes, cont)
   local mtime = slugs_to_mtimes[choice]
   vim.system({"curl", "-L", "https://documents.devdocs.io/" .. choice .. "/index.json?" .. mtime}, {text=true}, vim.schedule_wrap(function(res)
     local data = vim.fn.json_decode(res.stdout)
-    local name_to_path = {}
     local path_to_name = {}
     local known_keys_per_path = {}
     for _, entry in ipairs(data["entries"]) do
-      name_to_path[entry.name] = entry.path
       path_to_name[entry.path] = entry.name
 
       local file_id = vim.split(entry.path, "#")
@@ -175,11 +173,11 @@ local function apidoc_install(choice, slugs_to_mtimes, cont)
 
     -- now extract all the entries to non-html files
     local start_writing = vim.loop.hrtime()
-    for name, path in pairs(name_to_path) do
+    for path, name in pairs(path_to_name) do
       local file_id = vim.split(path, "#")
-      local sanitized_containing_file_name = ((path_to_name[file_id[1]] or file_id[1]) .. "#" .. file_id[1]):gsub("/", "_")
       local sanitized_fname = name:gsub("/", "_")
       if #file_id == 2 then
+        local sanitized_containing_file_name = ((path_to_name[file_id[1]] or file_id[1]) .. "#" .. file_id[1]):gsub("/", "_")
         local byte = name_and_id_to_pos[sanitized_containing_file_name][file_id[2]]
         local to_write_contents = nil
         if byte == nil then
@@ -196,7 +194,7 @@ local function apidoc_install(choice, slugs_to_mtimes, cont)
           to_write_contents = string.sub(name_to_contents[sanitized_containing_file_name], byte, next_byte)
         end
         local sanitized_name = name:gsub("/", "_")
-        local file = io.open(target_path .. "/" .. sanitized_name .. "#" .. file_id[1]:gsub("/", "_") .. ".html", "w")
+        local file = io.open((target_path .. "/" .. sanitized_name .. "#" .. path:gsub("/", "_")):sub(1, 250) .. ".html", "w")
         file:write(to_write_contents)
         file:close()
       end
@@ -207,12 +205,11 @@ local function apidoc_install(choice, slugs_to_mtimes, cont)
     -- convert the html to text, on 8 processes concurrently (-P8)
     vim.system({
       "sh", "-c",
-      [[find . -maxdepth 1 -name '*.html' -print0 | xargs -0 -P 8 -I param sh -c "elinks -config-dir ]] .. data_folder .. [[ -dump 'param' > 'param'.md"]]
+      [[find . -maxdepth 1 -name '*.html' -print0 | xargs -0 -P 8 -I param sh -c "elinks -config-dir ]] .. data_folder .. [[ -dump 'param' > 'param'.md && rm 'param'"]]
     }, {cwd=target_path}):wait()
     local elapsed_elinks = (vim.loop.hrtime() - start_elinks) / 1e9
 
     local start_pp = vim.loop.hrtime()
-    vim.system({"rm", "*.html"}, {cwd=target_path}):wait()
 
     -- unfortunately i must post-process the markdown to fix conceal table alignment..
     vim.system({"rg", "-l", "│"}, {cwd=target_path}, vim.schedule_wrap(function(res)
@@ -226,17 +223,18 @@ local function apidoc_install(choice, slugs_to_mtimes, cont)
         file:write(vim.fn.join(add_spaces_to_compensate_conceals_cols(lines), "\n"))
         file:close()
       end
+
+      local elapsed_pp = (vim.loop.hrtime() - start_pp) / 1e9
+
+      local elapsed = (vim.loop.hrtime() - start_install) / 1e9
+
+      vim.notify("Finished fetching documentation for " .. choice .. " in " .. elapsed .. "s. All parsing: " .. all_parsing
+      .. "s. All reading IDs: " .. all_reading_ids .. "s. All writing: " .. elapsed_writing .. "s. All elinks: " .. elapsed_elinks .. "s. All post-process: " .. elapsed_pp .. "s.")
+
+      if cont ~= nil then
+        cont()
+      end
     end)):wait()
-    local elapsed_pp = (vim.loop.hrtime() - start_pp) / 1e9
-
-    local elapsed = (vim.loop.hrtime() - start_install) / 1e9
-
-    vim.notify("Finished fetching documentation for " .. choice .. " in " .. elapsed .. "s. All parsing: " .. all_parsing
-    .. "s. All reading IDs: " .. all_reading_ids .. "s. All writing: " .. elapsed_writing .. "s. All elinks: " .. elapsed_elinks .. "s. All post-process: " .. elapsed_pp .. "s.")
-
-    if cont ~= nil then
-      cont()
-    end
   end))
 end))
 end
