@@ -4,43 +4,37 @@
 -- the ``` check.. unlikely a line has both ` and ```, lua regexes are
 -- painful and i don't want to break ``` patterns adding spaces.
 local function add_spaces_to_compensate_conceals_cols(lines)
+  local lines_str = vim.fn.join(lines, "\n")
+
   local query = vim.treesitter.query.parse('markdown_inline', [[[
     (code_span_delimiter) (emphasis_delimiter)
     (full_reference_link
       [
         "["
-        "]"
       ])
      (shortcut_link
        [
          "["
-         "]"
        ])
      (collapsed_reference_link
        [
          "["
-         "]"
        ])
      (inline_link
        [
          "["
-         "]"
          "("
          (link_destination)
-         ")"
        ])
       (image
         [
           "!"
           "["
-          "]"
           "("
           (link_destination)
-          ")"
         ])
     ] @concealed]])
 
-  local lines_str = vim.fn.join(lines, "\n")
   local parser = vim.treesitter.get_string_parser(lines_str, "markdown_inline")
   local tree = parser:parse()[1]
 
@@ -51,6 +45,50 @@ local function add_spaces_to_compensate_conceals_cols(lines)
       table.insert(pos_to_insert, {row, col, bytes})
     end
   end
+  -- go from the end because inserting is going to move offsets
+  for i = #pos_to_insert, 1, -1 do
+    local row, col, bytes = unpack(pos_to_insert[i])
+    lines[row+1] = lines[row+1]:sub(1, col) .. " " .. lines[row+1]:sub(col+1)
+  end
+
+  local lines_str = vim.fn.join(lines, "\n")
+
+  local query = vim.treesitter.query.parse('markdown_inline', [[[
+    (full_reference_link
+      [
+        "]"
+      ])
+     (shortcut_link
+       [
+         "]"
+       ])
+     (collapsed_reference_link
+       [
+         "]"
+       ])
+     (inline_link
+       [
+         "]"
+         ")"
+       ])
+      (image
+        [
+          "]"
+          ")"
+        ])
+    ] @concealed]])
+
+  local parser = vim.treesitter.get_string_parser(lines_str, "markdown_inline")
+  local tree = parser:parse()[1]
+
+  local pos_to_insert = {}
+  for id, node, metadata in query:iter_captures(tree:root(), lines) do
+    local row, col, bytes = node:end_()
+    if lines[row+1]:match("│") then
+      table.insert(pos_to_insert, {row, col, bytes})
+    end
+  end
+  -- go from the end because inserting is going to move offsets
   for i = #pos_to_insert, 1, -1 do
     local row, col, bytes = unpack(pos_to_insert[i])
     lines[row+1] = lines[row+1]:sub(1, col) .. " " .. lines[row+1]:sub(col+1)
@@ -139,8 +177,11 @@ local function apidoc_install(choice, slugs_to_mtimes, cont)
         local match = code_attrs:match("class=\"javascript\"")
         if match and children:match("\n") then
           return "<code" .. code_attrs .. ">\n```javascript\n" .. children .. "\n```</code>"
+        elseif not children:match("<a") then
+          -- don't wrap a tags in `` or we lose the links
+          return "<code" .. code_attrs .. ">`" .. children .. "`</code>"
         else
-          return "<code" .. code_attrs .. ">\n`" .. children .. "`</code>"
+          return "<code" .. code_attrs .. ">" .. children .. "</code>"
         end
       end)
       :gsub("<table", "<table border=\"1\"")
@@ -203,7 +244,7 @@ local function apidoc_install(choice, slugs_to_mtimes, cont)
         local sanitized_name = name:gsub("/", "_")
         local file = io.open((target_path .. "/" .. sanitized_name .. "#" .. path:gsub("/", "_")):sub(1, 250) .. ".html", "w")
         if path_to_type[file_id[1]] ~= nil then
-          file:write("> " .. path_to_type[file_id[1]] .. "\n")
+          file:write("> " .. path_to_type[file_id[1]] .. "/" .. path_to_name[file_id[1]] .. "\n")
         end
         file:write(to_write_contents)
         file:close()
