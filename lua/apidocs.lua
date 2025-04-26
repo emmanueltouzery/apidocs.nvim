@@ -35,21 +35,23 @@ local function add_spaces_to_compensate_conceals_cols(lines)
         ])
     ] @concealed]])
 
-  local parser = vim.treesitter.get_string_parser(lines_str, "markdown_inline")
-  local tree = parser:parse()[1]
+  local parser = vim.treesitter.get_string_parser(lines_str, "markdown")
+  parser:parse(true)
 
-  local pos_to_insert = {}
-  for id, node, metadata in query:iter_captures(tree:root(), lines) do
-    local row, col, bytes = node:start()
-    if lines[row+1]:match("│") then
-      table.insert(pos_to_insert, {row, col, bytes})
+  parser:for_each_tree(function(tree)
+    local pos_to_insert = {}
+    for id, node, metadata in query:iter_captures(tree:root(), lines) do
+      local row, col, bytes = node:start()
+      if lines[row+1]:match("│") then
+        table.insert(pos_to_insert, {row, col, bytes})
+      end
     end
-  end
-  -- go from the end because inserting is going to move offsets
-  for i = #pos_to_insert, 1, -1 do
-    local row, col, bytes = unpack(pos_to_insert[i])
-    lines[row+1] = lines[row+1]:sub(1, col) .. " " .. lines[row+1]:sub(col+1)
-  end
+    -- go from the end because inserting is going to move offsets
+    for i = #pos_to_insert, 1, -1 do
+      local row, col, bytes = unpack(pos_to_insert[i])
+      lines[row+1] = lines[row+1]:sub(1, col) .. " " .. lines[row+1]:sub(col+1)
+    end
+  end)
 
   local lines_str = vim.fn.join(lines, "\n")
 
@@ -78,21 +80,23 @@ local function add_spaces_to_compensate_conceals_cols(lines)
         ])
     ] @concealed]])
 
-  local parser = vim.treesitter.get_string_parser(lines_str, "markdown_inline")
-  local tree = parser:parse()[1]
+  local parser = vim.treesitter.get_string_parser(lines_str, "markdown")
+  parser:parse(true)
+  parser:for_each_tree(function(tree)
 
-  local pos_to_insert = {}
-  for id, node, metadata in query:iter_captures(tree:root(), lines) do
-    local row, col, bytes = node:end_()
-    if lines[row+1]:match("│") then
-      table.insert(pos_to_insert, {row, col, bytes})
+    local pos_to_insert = {}
+    for id, node, metadata in query:iter_captures(tree:root(), lines) do
+      local row, col, bytes = node:end_()
+      if lines[row+1]:match("│") then
+        table.insert(pos_to_insert, {row, col, bytes})
+      end
     end
-  end
-  -- go from the end because inserting is going to move offsets
-  for i = #pos_to_insert, 1, -1 do
-    local row, col, bytes = unpack(pos_to_insert[i])
-    lines[row+1] = lines[row+1]:sub(1, col) .. " " .. lines[row+1]:sub(col+1)
-  end
+    -- go from the end because inserting is going to move offsets
+    for i = #pos_to_insert, 1, -1 do
+      local row, col, bytes = unpack(pos_to_insert[i])
+      lines[row+1] = lines[row+1]:sub(1, col) .. " " .. lines[row+1]:sub(col+1)
+    end
+  end)
 
   return lines
 end
@@ -200,7 +204,11 @@ local function apidoc_install(choice, slugs_to_mtimes, cont)
           return "<code" .. code_attrs .. ">\n```javascript\n" .. children .. "\n```</code>"
         elseif not children:match("<a") then
           -- don't wrap a tags in `` or we lose the links
-          return "<code" .. code_attrs .. ">`" .. children .. "`</code>"
+          if children:match("\n") then
+            return "<code" .. code_attrs .. ">\n```\n" .. children .. "\n```\n</code>"
+          else
+            return "<code" .. code_attrs .. ">`" .. children .. "`</code>"
+          end
         else
           return "<code" .. code_attrs .. ">" .. children .. "</code>"
         end
