@@ -120,25 +120,27 @@ local function apidoc_install(choice, slugs_to_mtimes, cont)
       local sanitized_key = ((path_to_name[key] or key) .. "#" .. key):gsub("/", "_")
       local file = io.open(target_path .. "/" .. sanitized_key  .. ".html", "w")
       contents = data[key]
-      :gsub("<pre([^>]*)>([^`][^<]+)</pre>", function(pre_attrs, children)
+      :gsub("<pre([^>]*)>(.-)</pre>", function(pre_attrs, children)
         local match = pre_attrs:match("[^<>]*data%-language=\"(%w+)\"")
-        if match then
-          return "<pre>\n```" .. match .. "\n" .. children .. "\n```</pre>"
-        elseif not children:match("<code") then
+        -- don't put ``` unless it's multiline
+        if match and children:match("\n") then
+          return "<pre>\n```" .. match .. "\n" .. children:gsub("</?code>", "") .. "\n```</pre>"
+        elseif not children:match("<code") and children:match("\n") then
           return "<pre" ..pre_attrs .. ">\n```\n" .. children .. "\n```</pre>"
+        elseif not children:match("<code") and not children:match("\n") then
+          return "<pre" ..pre_attrs .. ">\n`" .. children .. "`</pre>"
         else
           -- sometimes there is <pre><code></code></pre>. don't add double ```, let <code> handle it
           return "<pre" .. pre_attrs .. ">" .. children .. "</pre>"
         end
       end)
       :gsub("<td class=.font%-monospace.>([^<]+)</td>", "<td>`%1`</td>")
-      :gsub("<code([^>]*)>([^<\n]+)</code>", "<code%1>`%2`</code>")
-      :gsub("<code([^>]*)>([^`][^<]+)</code>", function(code_attrs, children)
+      :gsub("<code([^>]*)>(.-)</code>", function(code_attrs, children)
         local match = code_attrs:match("class=\"javascript\"")
-        if match then
+        if match and children:match("\n") then
           return "<code" .. code_attrs .. ">\n```javascript\n" .. children .. "\n```</code>"
         else
-          return "<code" .. code_attrs .. ">\n```\n" .. children .. "\n```</code>"
+          return "<code" .. code_attrs .. ">\n`" .. children .. "`</code>"
         end
       end)
       :gsub("<table", "<table border=\"1\"")
