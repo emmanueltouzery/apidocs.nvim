@@ -431,7 +431,7 @@ local function apidocs_open(params, slugs_to_mtimes)
             callback = function()
               local action_state = require("telescope.actions.state")
               local current_picker = action_state.get_current_picker(vim.api.nvim_get_current_buf())
-              if current_picker.prompt_title == "API docs" then
+              if current_picker.prompt_title == "API docs" or current_picker.prompt_title == "API docs search" then
                 local winid = current_picker.all_previewers[1].state.winid
                 vim.wo[winid].conceallevel = 2
                 vim.wo[winid].concealcursor = "n"
@@ -471,7 +471,58 @@ local function apidocs_open(params, slugs_to_mtimes)
   }):find()
 end
 
+local function apidocs_search()
+  local previewers = require("telescope.previewers")
+  require('telescope.builtin').live_grep({
+    cwd = data_folder(),
+    prompt_title = "API docs search",
+    previewer = previewers.new_buffer_previewer({
+      -- messy because of the conceal
+      setup = function(self)
+        vim.schedule(function()
+          local winid = self.state.winid
+          vim.wo[winid].conceallevel = 2
+          vim.wo[winid].concealcursor = "n"
+          local augroup = vim.api.nvim_create_augroup('TelescopeApiDocsResumeConceal', { clear = true })
+          vim.api.nvim_create_autocmd({"User"}, {
+            group = augroup,
+            pattern = "TelescopeResumePost",
+            callback = function()
+              local action_state = require("telescope.actions.state")
+              local current_picker = action_state.get_current_picker(vim.api.nvim_get_current_buf())
+              if current_picker.prompt_title == "API docs" or current_picker.prompt_title == "API docs search" then
+                local winid = current_picker.all_previewers[1].state.winid
+                vim.wo[winid].conceallevel = 2
+                vim.wo[winid].concealcursor = "n"
+              end
+            end
+          })
+        end)
+        return {}
+      end,
+      define_preview = function(self, entry)
+        -- TODO the path could contain a ":"
+        local path, lnum, col, line = unpack(vim.split(entry.value, ":"))
+        load_doc_in_buffer(self.state.bufnr, data_folder() .. path)
+
+        local ns = vim.api.nvim_create_namespace('my_highlights')
+        vim.api.nvim_buf_set_extmark(self.state.bufnr, ns, tonumber(lnum)-1, 0, {
+          end_line = tonumber(lnum),
+          hl_group = 'TelescopePreviewMatch',
+        })
+        vim.schedule(function()
+          vim.api.nvim_buf_call(self.state.bufnr, function()
+            vim.cmd(":" .. lnum)
+            vim.cmd("norm! zz")
+          end)
+        end)
+      end,
+    })
+  })
+end
+
 return {
   apidocs_install = apidocs_install,
   apidocs_open = apidocs_open,
+  apidocs_search = apidocs_search,
 }
