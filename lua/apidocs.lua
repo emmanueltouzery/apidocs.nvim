@@ -97,6 +97,27 @@ local function add_spaces_to_compensate_conceals_cols(lines)
   return lines
 end
 
+local function html_extra_css(source)
+  if source:match("openjdk") then
+    return [[
+<html>
+  <head>
+    <style>
+      ul.inheritance {
+        list-style:none
+      }
+      ul.inheritance ul.inheritance {
+        margin:0
+      }
+    </style>
+  </head>
+  <body>
+    ]]
+  else
+    return ""
+  end
+end
+
 local function data_folder()
   return vim.fn.stdpath("data") .. "/apidocs-data/"
 end
@@ -185,6 +206,7 @@ local function apidoc_install(choice, slugs_to_mtimes, cont)
         end
       end)
       :gsub("<table", "<table border=\"1\"")
+      file:write(html_extra_css(choice))
       if path_to_type[key] ~= nil then
         file:write("> " .. path_to_type[key] .. "\n")
       end
@@ -243,6 +265,7 @@ local function apidoc_install(choice, slugs_to_mtimes, cont)
         end
         local sanitized_name = name:gsub("/", "_")
         local file = io.open((target_path .. "/" .. sanitized_name .. "#" .. path:gsub("/", "_")):sub(1, 250) .. ".html", "w")
+        file:write(html_extra_css(choice))
         if path_to_type[file_id[1]] ~= nil then
           file:write("> " .. path_to_type[file_id[1]] .. "/" .. path_to_name[file_id[1]] .. "\n")
         end
