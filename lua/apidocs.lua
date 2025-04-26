@@ -479,10 +479,14 @@ local function apidocs_open(params, slugs_to_mtimes)
   }):find()
 end
 
-local function apidocs_search()
+local function apidocs_search(opts)
   local previewers = require("telescope.previewers")
+  local folder = data_folder()
+  if opts and opts.source then
+    folder = folder .. opts.source .. "/"
+  end
   require('telescope.builtin').live_grep({
-    cwd = data_folder(),
+    cwd = folder,
     prompt_title = "API docs search",
     previewer = previewers.new_buffer_previewer({
       -- messy because of the conceal
@@ -509,18 +513,16 @@ local function apidocs_search()
         return {}
       end,
       define_preview = function(self, entry)
-        -- TODO the path could contain a ":"
-        local path, lnum, col, line = unpack(vim.split(entry.value, ":"))
-        load_doc_in_buffer(self.state.bufnr, data_folder() .. path)
+        load_doc_in_buffer(self.state.bufnr, folder .. entry.filename)
 
         local ns = vim.api.nvim_create_namespace('my_highlights')
-        vim.api.nvim_buf_set_extmark(self.state.bufnr, ns, tonumber(lnum)-1, 0, {
-          end_line = tonumber(lnum),
+        vim.api.nvim_buf_set_extmark(self.state.bufnr, ns, entry.lnum-1, 0, {
+          end_line = entry.lnum,
           hl_group = 'TelescopePreviewMatch',
         })
         vim.schedule(function()
           vim.api.nvim_buf_call(self.state.bufnr, function()
-            vim.cmd(":" .. lnum)
+            vim.cmd(":" .. entry.lnum)
             vim.cmd("norm! zz")
           end)
         end)
