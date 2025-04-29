@@ -117,7 +117,7 @@ local function urldecode(url)
 end
 
 local function fix_file_links(fname, lines, target_path, choice, path_to_name,
-    name_and_id_to_string_nearby, orig_path)
+    name_and_id_to_string_nearby, orig_path, orig_containing_path)
   local changes = false
   for i = #lines, 1, -1 do
     local l, m = lines[i]:match("^( +%d+%. )(.*)$")
@@ -132,6 +132,7 @@ local function fix_file_links(fname, lines, target_path, choice, path_to_name,
       if m:match("getattribute") then
         print("m " .. m)
         print("orig_path " .. orig_path)
+        print("orig_containing_path " .. orig_containing_path)
       end
       local prefix = "file://" .. target_path
       -- if the link points to target_path/orig_subfolder/../../ then i must use orig_path/../../
@@ -162,9 +163,23 @@ local function fix_file_links(fname, lines, target_path, choice, path_to_name,
       end
       local file_id = vim.split(link_target, "#")
       if #file_id == 4 then
-        -- for lua, the path sometimes contains a #...
         -- it's a link to the same file, which was already properly named... "name#pa#th#id"
-        local path = sanitize_fname(file_id[1]:gsub("^/", "") .. "#" .. file_id[2] .. "#" .. file_id[3]:gsub("%.html$", ""))
+        -- the trick is that if we're a file split from a larger file and we're pointing back
+        -- to ourself, we likely want to point back to the original large file, not to us,
+        -- which are the smaller split file.
+        local link_file = file_id[2] .. "#" .. file_id[3]:gsub("%.html$", "")
+        -- if m:match("Blocks") then
+        --   print("link_file " .. link_file)
+        --   print("orig_path " .. orig_path)
+        --   print("orig_containing_path " .. orig_containing_path)
+        -- end
+        local path = sanitize_fname(file_id[1]:gsub("^/", "") .. "#" .. link_file) -- TODO is that ever used?
+        if link_file == orig_path and orig_containing_path ~= nil then
+          path = orig_containing_path
+        end
+        -- if m:match("Blocks") then
+        --   print("path: " ..path)
+        -- end
         if path ~= nil then
           if name_and_id_to_string_nearby[path] ~= nil then
             local text_section = name_and_id_to_string_nearby[path][file_id[4]]
@@ -309,6 +324,7 @@ local function apidoc_install(choice, slugs_to_mtimes, cont)
       local name_known_byte_offsets = {}
       local name_to_contents = {}
       local out_path_to_orig_path = {}
+      local out_path_to_orig_containing_path = {}
 
       local query = vim.treesitter.query.parse('html', [[
       (attribute
@@ -423,6 +439,7 @@ local function apidoc_install(choice, slugs_to_mtimes, cont)
         local sanitized_name = sanitize_fname(name)
         local out_path = sanitize_fname(sanitized_name .. "#" .. path):sub(1, 250) .. ".html"
         out_path_to_orig_path[out_path] = path
+        out_path_to_orig_containing_path[out_path] = sanitized_containing_file_name
         local file = io.open(target_path .. "/" .. out_path, "w")
         file:write(html_extra_css(choice))
         if path_to_type[file_id[1]] ~= nil then
@@ -470,7 +487,8 @@ local function apidoc_install(choice, slugs_to_mtimes, cont)
             table.insert(lines, line)
           end
           local after_links, changes = fix_file_links(
-            filepath, lines, target_path, choice, path_to_name, name_and_id_to_string_nearby, out_path_to_orig_path[name:gsub(".md$", "")])
+            filepath, lines, target_path, choice, path_to_name, name_and_id_to_string_nearby,
+            out_path_to_orig_path[name:gsub(".md$", "")], out_path_to_orig_containing_path[name:gsub(".md$", "")])
           if changes then
             local file = io.open(filepath, "w")
             file:write(vim.fn.join(after_links, "\n"))
