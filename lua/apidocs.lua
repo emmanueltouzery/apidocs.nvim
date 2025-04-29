@@ -121,6 +121,11 @@ local function fix_file_links(fname, lines, target_path, choice, path_to_name,
   local changes = false
   for i = #lines, 1, -1 do
     local l, m = lines[i]:match("^( +%d+%. )(.*)$")
+    if m == nil and i > 1 and lines[i-1]:match("^ +%d+%. .*$") and vim.startswith(lines[i], "\t") then
+      -- sometimes the format is not "number. link", but "number. desc\n\tlink". maybe when the link has
+      -- a description? this happens with rust
+      l, m = lines[i]:match("^(\t)(.*)$")
+    end
     -- remove the path prefix, which could be the folder in which we store the files, or
     -- any parent of it, in case it's a link to '../../filename'
     if m ~= nil and m:match("^file://") then
@@ -132,7 +137,7 @@ local function fix_file_links(fname, lines, target_path, choice, path_to_name,
       if m:match("getattribute") then
         print("m " .. m)
         print("orig_path " .. orig_path)
-        print("orig_containing_path " .. orig_containing_path)
+        print("orig_containing_path " .. vim.inspect(orig_containing_path))
       end
       local prefix = "file://" .. target_path
       -- if the link points to target_path/orig_subfolder/../../ then i must use orig_path/../../
@@ -158,10 +163,10 @@ local function fix_file_links(fname, lines, target_path, choice, path_to_name,
       end
 
       local link_target = urldecode(m):gsub("^" .. escape_pattern(prefix), "")
-      if m:match("getattribute") then
-        print("link_target " .. link_target)
-      end
       local file_id = vim.split(link_target, "#")
+      if m:match("struct.cstring") then
+        print("link_target " .. link_target .. " " .. (#file_id))
+      end
       if #file_id == 4 then
         -- it's a link to the same file, which was already properly named... "name#pa#th#id"
         -- the trick is that if we're a file split from a larger file and we're pointing back
@@ -185,6 +190,9 @@ local function fix_file_links(fname, lines, target_path, choice, path_to_name,
             local text_section = name_and_id_to_string_nearby[path][file_id[4]]
             if text_section ~= nil then
               lines[i] = l .. "local://" .. choice .. "/" .. sanitize_fname(path) .. "#" .. text_section
+              if m:match("struct.cstring") then
+                print(lines[i])
+              end
               changes = true
             end
           -- elseif #vim.tbl_keys(name_and_id_to_string_nearby) == 1 then
@@ -202,6 +210,9 @@ local function fix_file_links(fname, lines, target_path, choice, path_to_name,
           local text_section = name_and_id_to_string_nearby[path][file_id[3]]
           if text_section ~= nil then
             lines[i] = l .. "local://" .. choice .. "/" .. sanitize_fname(path) .. "#" .. text_section
+              if m:match("struct.cstring") then
+                print(lines[i])
+              end
             changes = true
           end
         end
@@ -212,6 +223,9 @@ local function fix_file_links(fname, lines, target_path, choice, path_to_name,
           local text_section = name_and_id_to_string_nearby[sanitize_fname(name .. "#" .. file_id[1]:gsub("^/", ""))][file_id[2]]
           if text_section ~= nil then
             lines[i] = l .. "local://" .. choice .. "/" .. sanitize_fname(sanitize_fname(name .. "#" .. file_id[1]:gsub("^/", "")) .. "#" .. text_section)
+              if m:match("struct.cstring") then
+                print(lines[i])
+              end
             changes = true
           end
         end
@@ -224,7 +238,7 @@ local function fix_file_links(fname, lines, target_path, choice, path_to_name,
         link_target = link_target:gsub("^/", "")
         local name = path_to_name[file_guessed_subpath_str .. "/" .. link_target] or path_to_name[link_target]
 
-        -- if m:match("getattribute") then
+        -- if m:match("struct.cstring") then
         --   print("name " .. name)
         --   print("file_guessed_subpath_str " .. file_guessed_subpath_str)
         --   print("link_target " .. link_target)
@@ -249,6 +263,9 @@ local function fix_file_links(fname, lines, target_path, choice, path_to_name,
         --   print("link_target: " .. link_target)
         --   print("orig_path: " .. orig_path)
         end
+      end
+      if m:match("struct.cstring") then
+        print("done for line, changes? " .. vim.inspect(changes))
       end
     end
   end
@@ -686,6 +703,11 @@ local function apidocs_open(params, slugs_to_mtimes)
           local line = vim.api.nvim_buf_get_lines(0, vim.fn.line(".")-1, vim.fn.line("."), false)[1]
           -- print(line)
           local m = string.match(line, "^%s+%d+%. local://")
+          if m == nil and vim.startswith(line, "\tlocal://") then
+            -- sometimes the format is not "number. link", but "number. desc\n\tlink". maybe when the link has
+            -- a description? this happens with rust
+            m = string.match(line, "^\tlocal://")
+          end
           if m then
             local target = line:sub(#m+1)
             local components = vim.split(target, "#")
