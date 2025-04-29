@@ -116,8 +116,23 @@ local function urldecode(url)
   return url:gsub("%%20", " "):gsub("%%3c", "<"):gsub("%%3e", ">"):gsub("%%23", "#")
 end
 
+local function fix_file_links_resolve_fname(choice, path_to_name, file_guessed_subpath_str, link_target)
+  local name = path_to_name[file_guessed_subpath_str .. "/" .. link_target] or path_to_name[link_target]
+  if name ~= nil then
+    if #file_guessed_subpath_str > 0 then
+      return "local://" .. choice .. "/", sanitize_fname(name .. "#" .. file_guessed_subpath_str .. "/" .. link_target)
+    else
+      return "local://" .. choice .. "/", sanitize_fname(name .. "#" .. link_target)
+    end
+  end
+  return nil, nil
+end
+
 local function fix_file_links(fname, lines, target_path, choice, path_to_name,
     name_and_id_to_string_nearby, orig_path, orig_containing_path)
+  -- if not fname:match("openjdk.8/ForkJoinPool#java_util_concurrent_forkjoinpool.html") then
+  --   return
+  -- end
   local changes = false
   for i = #lines, 1, -1 do
     local l, m = lines[i]:match("^( +%d+%. )(.*)$")
@@ -163,10 +178,11 @@ local function fix_file_links(fname, lines, target_path, choice, path_to_name,
       end
 
       local link_target = urldecode(m):gsub("^" .. escape_pattern(prefix), "")
+      -- print("link_target: " .. link_target)
       local file_id = vim.split(link_target, "#")
-      if m:match("struct.cstring") then
-        print("link_target " .. link_target .. " " .. (#file_id))
-      end
+      -- if m:match("struct.cstring") then
+      --   print("link_target " .. link_target .. " " .. (#file_id))
+      -- end
       if #file_id == 4 then
         -- it's a link to the same file, which was already properly named... "name#pa#th#id"
         -- the trick is that if we're a file split from a larger file and we're pointing back
@@ -190,9 +206,10 @@ local function fix_file_links(fname, lines, target_path, choice, path_to_name,
             local text_section = name_and_id_to_string_nearby[path][file_id[4]]
             if text_section ~= nil then
               lines[i] = l .. "local://" .. choice .. "/" .. sanitize_fname(path) .. "#" .. text_section
-              if m:match("struct.cstring") then
-                print(lines[i])
-              end
+              -- print(" 4=> " .. lines[i])
+              -- if m:match("struct.cstring") then
+              --   print(lines[i])
+              -- end
               changes = true
             end
           -- elseif #vim.tbl_keys(name_and_id_to_string_nearby) == 1 then
@@ -210,48 +227,35 @@ local function fix_file_links(fname, lines, target_path, choice, path_to_name,
           local text_section = name_and_id_to_string_nearby[path][file_id[3]]
           if text_section ~= nil then
             lines[i] = l .. "local://" .. choice .. "/" .. sanitize_fname(path) .. "#" .. text_section
-              if m:match("struct.cstring") then
-                print(lines[i])
-              end
+            -- print(" 3=> " .. lines[i])
+            --   if m:match("struct.cstring") then
+            --     print(lines[i])
+            --   end
             changes = true
           end
         end
       elseif #file_id == 2 then
         -- link to another file, ID lookup
-        local name = path_to_name[file_id[1]:gsub("^/", "")]
-        if name ~= nil then
-          local text_section = name_and_id_to_string_nearby[sanitize_fname(name .. "#" .. file_id[1]:gsub("^/", ""))][file_id[2]]
+        local local_path, local_fname = fix_file_links_resolve_fname(choice, path_to_name, file_guessed_subpath_str, file_id[1]:gsub("^/", ""))
+        if local_path ~= nil and name_and_id_to_string_nearby[local_fname] then
+          local text_section = name_and_id_to_string_nearby[local_fname][file_id[2]]
           if text_section ~= nil then
-            lines[i] = l .. "local://" .. choice .. "/" .. sanitize_fname(sanitize_fname(name .. "#" .. file_id[1]:gsub("^/", "")) .. "#" .. text_section)
-              if m:match("struct.cstring") then
-                print(lines[i])
-              end
+            lines[i] = l .. local_path .. local_fname .. "#" .. text_section
+            -- print(" 2=> " .. local_path .. local_fname .. "#" .. text_section)
             changes = true
+          -- else
+          --   print("no text section for " .. file_id[2])
           end
+        -- else
+        --   print("failed, text_section: " .. vim.inspect(text_section) .. ", name_and_id_to_string_nearby[" .. local_fname .. "]: " .. vim.inspect(name_and_id_to_string_nearby[local_fname]) .. " key: " .. file_id[2])
+        --   print("first key in name hash: " .. vim.tbl_keys(name_and_id_to_string_nearby)[1])
         end
       else
-        -- link to a pain file, no ID lookup
-        -- print("will search for: '" .. file_guessed_subpath_str .. link_target .. "'")
-        -- print(vim.inspect(path_to_name))
-        -- print(vim.inspect(path_to_name))
-        -- print(file_guessed_subpath_str)
-        link_target = link_target:gsub("^/", "")
-        local name = path_to_name[file_guessed_subpath_str .. "/" .. link_target] or path_to_name[link_target]
 
-        -- if m:match("struct.cstring") then
-        --   print("name " .. name)
-        --   print("file_guessed_subpath_str " .. file_guessed_subpath_str)
-        --   print("link_target " .. link_target)
-        -- end
-        if name ~= nil then
-          if #file_guessed_subpath_str > 0 then
-            lines[i] = l .. "local://" .. choice .. "/" .. sanitize_fname(name .. "#" .. file_guessed_subpath_str .. "/" .. link_target)
-          else
-            lines[i] = l .. "local://" .. choice .. "/" .. sanitize_fname(name .. "#" .. link_target)
-          end
-          if m:match("getattribute") then
-            print(lines[i])
-          end
+        local local_path, local_fname = fix_file_links_resolve_fname(choice, path_to_name, file_guessed_subpath_str, link_target:gsub("^/", ""))
+        if local_path ~= nil then
+          lines[i] = l .. local_path .. local_fname
+          -- print(" 1=> " .. local_path .. local_fname)
           changes = true
         -- else
         --   print(m)
@@ -264,9 +268,9 @@ local function fix_file_links(fname, lines, target_path, choice, path_to_name,
         --   print("orig_path: " .. orig_path)
         end
       end
-      if m:match("struct.cstring") then
-        print("done for line, changes? " .. vim.inspect(changes))
-      end
+      -- if m:match("struct.cstring") then
+      --   print("done for line, changes? " .. vim.inspect(changes))
+      -- end
     end
   end
   return lines, changes
@@ -420,10 +424,15 @@ local function apidoc_install(choice, slugs_to_mtimes, cont)
             and node:parent():parent():next_named_sibling() ~= nil
             and node:parent():parent():next_named_sibling():type() == "text" then
             name_and_id_to_string_nearby[sanitized_key][id_val] =
-            vim.treesitter.get_node_text(node:parent():parent():next_named_sibling(), contents)
+              vim.treesitter.get_node_text(node:parent():parent():next_named_sibling(), contents)
+            -- elseif sanitized_key:match("ForkJoinPool") then
+            --   print("can't find string for " .. id_val)
           end
         end
       end
+      -- if sanitized_key:match("ForkJoinPool") then
+      --   print(vim.inspect(name_and_id_to_string_nearby[sanitized_key]))
+      -- end
       all_reading_ids = all_reading_ids + elapsed
 
       -- need to sort offsets, later i search for the byte offset after my current one
