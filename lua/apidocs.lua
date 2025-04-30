@@ -427,6 +427,28 @@ local function apidoc_install(choice, slugs_to_mtimes, cont)
               vim.treesitter.get_node_text(node:parent():parent():next_named_sibling(), contents)
             -- elseif sanitized_key:match("ForkJoinPool") then
             --   print("can't find string for " .. id_val)
+          elseif choice == "rust" and node:parent() ~= nil and node:parent():parent() ~= nil and node:parent():parent():parent() ~= nil then
+            -- for rust, the node text is a little harder to find
+            local elt = node:parent():parent():parent()
+            if elt:type() == "element" and elt:named_child_count() >= 3 then
+              local next_elt = elt:named_children()[3]
+              if next_elt:type() == "element" and next_elt:named_child_count() >= 2 then
+                local text = next_elt:named_children()[2]
+                if text:type() == "text" then
+                  local text_contents = vim.treesitter.get_node_text(text, contents)
+                  local lines = vim.split(text_contents, "\n")
+                  if #lines > 1 then
+                    text_contents = lines[1]
+                    for i = 2, #lines do
+                      if #lines[i] > #text_contents then
+                        text_contents = lines[i]
+                      end
+                    end
+                  end
+                  name_and_id_to_string_nearby[sanitized_key][id_val] = text_contents
+                end
+              end
+            end
           end
         end
       end
