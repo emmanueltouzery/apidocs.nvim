@@ -130,9 +130,6 @@ end
 
 local function fix_file_links(fname, lines, target_path, choice, path_to_name,
     name_and_id_to_string_nearby, orig_path, orig_containing_path)
-  -- if not fname:match("openjdk.8/ForkJoinPool#java_util_concurrent_forkjoinpool.html") then
-  --   return
-  -- end
   local changes = false
   for i = #lines, 1, -1 do
     local l, m = lines[i]:match("^( +%d+%. )(.*)$")
@@ -149,18 +146,9 @@ local function fix_file_links(fname, lines, target_path, choice, path_to_name,
         -- completing the gsub before.. no child folder. remove the filename
         file_guessed_subpath_str = ""
       end
-      if m:match("getattribute") then
-        print("m " .. m)
-        print("orig_path " .. orig_path)
-        print("orig_containing_path " .. vim.inspect(orig_containing_path))
-      end
       local prefix = "file://" .. target_path
       -- if the link points to target_path/orig_subfolder/../../ then i must use orig_path/../../
       while #prefix > 0 do
-        if m:match("getattribute") then
-          print("prefix " .. prefix)
-          print("file_guessed_subpath_str " .. file_guessed_subpath_str)
-        end
         -- take the parent folder of the prefix until it is a prefix of m.
         if m:match("^" .. escape_pattern(prefix)) then
           break
@@ -173,51 +161,32 @@ local function fix_file_links(fname, lines, target_path, choice, path_to_name,
           file_guessed_subpath_str = ""
         end
       end
-      if m:match("getattribute") then
-        print("final file_guessed_subpath_str " .. file_guessed_subpath_str)
-      end
 
       local link_target = urldecode(m):gsub("^" .. escape_pattern(prefix), "")
-      -- print("link_target: " .. link_target)
       local file_id = vim.split(link_target, "#")
-      -- if m:match("struct.cstring") then
-      --   print("link_target " .. link_target .. " " .. (#file_id))
-      -- end
       if #file_id == 4 then
         -- it's a link to the same file, which was already properly named... "name#pa#th#id"
         -- the trick is that if we're a file split from a larger file and we're pointing back
         -- to ourself, we likely want to point back to the original large file, not to us,
         -- which are the smaller split file.
         local link_file = file_id[2] .. "#" .. file_id[3]:gsub("%.html$", "")
-        -- if m:match("Blocks") then
-        --   print("link_file " .. link_file)
-        --   print("orig_path " .. orig_path)
-        --   print("orig_containing_path " .. orig_containing_path)
-        -- end
         local path = sanitize_fname(file_id[1]:gsub("^/", "") .. "#" .. link_file) -- TODO is that ever used?
         if link_file == orig_path and orig_containing_path ~= nil then
           path = orig_containing_path
         end
-        -- if m:match("Blocks") then
-        --   print("path: " ..path)
-        -- end
         if path ~= nil then
           if name_and_id_to_string_nearby[path] ~= nil then
             local text_section = name_and_id_to_string_nearby[path][file_id[4]]
             if text_section ~= nil then
               lines[i] = l .. "local://" .. choice .. "/" .. sanitize_fname(path) .. "#" .. text_section
-              -- print(" 4=> " .. lines[i])
-              -- if m:match("struct.cstring") then
-              --   print(lines[i])
-              -- end
+              changes = true
+            else
+              -- can't find a header by that name in the source file. sometimes the files
+              -- are just broken. for instance date_fns/I18n Contribution Guide.
+              -- in that case do the same as upstream devdocs/the browser: show the file at the top, ignoring the ID.
+              lines[i] = l .. "local://" .. choice .. "/" .. sanitize_fname(path) .. "\t+" .. file_id[4]
               changes = true
             end
-          -- elseif #vim.tbl_keys(name_and_id_to_string_nearby) == 1 then
-          --   local text_section = name_and_id_to_string_nearby[vim.tbl_keys(name_and_id_to_string_nearby)[1]][file_id[4]]
-          --   if text_section ~= nil then
-          --     lines[i] = l .. "local://" .. choice .. "/" .. sanitize_fname(path) .. "#" .. text_section
-          --     changes = true
-          --   end
           end
         end
       elseif #file_id == 3 then
@@ -227,10 +196,12 @@ local function fix_file_links(fname, lines, target_path, choice, path_to_name,
           local text_section = name_and_id_to_string_nearby[path][file_id[3]]
           if text_section ~= nil then
             lines[i] = l .. "local://" .. choice .. "/" .. sanitize_fname(path) .. "#" .. text_section
-            -- print(" 3=> " .. lines[i])
-            --   if m:match("struct.cstring") then
-            --     print(lines[i])
-            --   end
+            changes = true
+          else
+            -- can't find a header by that name in the source file. sometimes the files
+            -- are just broken. for instance date_fns/I18n Contribution Guide.
+            -- in that case do the same as upstream devdocs/the browser: show the file at the top, ignoring the ID.
+            lines[i] = l .. "local://" .. choice .. "/" .. sanitize_fname(path) .. "\t+" .. file_id[3]
             changes = true
           end
         end
@@ -241,36 +212,22 @@ local function fix_file_links(fname, lines, target_path, choice, path_to_name,
           local text_section = name_and_id_to_string_nearby[local_fname][file_id[2]]
           if text_section ~= nil then
             lines[i] = l .. local_path .. local_fname .. "#" .. text_section
-            -- print(" 2=> " .. local_path .. local_fname .. "#" .. text_section)
             changes = true
-          -- else
-          --   print("no text section for " .. file_id[2])
+          else
+            -- can't find a header by that name in the source file. sometimes the files
+            -- are just broken. for instance date_fns/I18n Contribution Guide.
+            -- in that case do the same as upstream devdocs/the browser: show the file at the top, ignoring the ID.
+            lines[i] = l .. local_path .. local_fname .. "\t+" .. file_id[2]
+            changes = true
           end
-        -- else
-        --   print("failed, text_section: " .. vim.inspect(text_section) .. ", name_and_id_to_string_nearby[" .. local_fname .. "]: " .. vim.inspect(name_and_id_to_string_nearby[local_fname]) .. " key: " .. file_id[2])
-        --   print("first key in name hash: " .. vim.tbl_keys(name_and_id_to_string_nearby)[1])
         end
       else
-
         local local_path, local_fname = fix_file_links_resolve_fname(choice, path_to_name, file_guessed_subpath_str, link_target:gsub("^/", ""))
         if local_path ~= nil then
           lines[i] = l .. local_path .. local_fname
-          -- print(" 1=> " .. local_path .. local_fname)
           changes = true
-        -- else
-        --   print(m)
-        --   print(vim.inspect(path_to_name))
-        --   print("NOT FOUND")
-        --   print("prefix => " .. prefix)
-        --   print("m => " .. m)
-        --   print("file_guessed_subpath_str: " .. file_guessed_subpath_str)
-        --   print("link_target: " .. link_target)
-        --   print("orig_path: " .. orig_path)
         end
       end
-      -- if m:match("struct.cstring") then
-      --   print("done for line, changes? " .. vim.inspect(changes))
-      -- end
     end
   end
   return lines, changes
@@ -738,7 +695,6 @@ local function apidocs_open(params, slugs_to_mtimes)
 
         vim.keymap.set("n", "<C-]>", function()
           local line = vim.api.nvim_buf_get_lines(0, vim.fn.line(".")-1, vim.fn.line("."), false)[1]
-          -- print(line)
           local m = string.match(line, "^%s+%d+%. local://")
           if m == nil and vim.startswith(line, "\tlocal://") then
             -- sometimes the format is not "number. link", but "number. desc\n\tlink". maybe when the link has
@@ -746,10 +702,10 @@ local function apidocs_open(params, slugs_to_mtimes)
             m = string.match(line, "^\tlocal://")
           end
           if m then
-            local target = line:sub(#m+1)
+            -- when parsing the local:// url, drop "<tab>+" text at the end,
+            -- we add this marker when we can't resolve the ID reference
+            local target = line:sub(#m+1):gsub("\t%+.+$", "")
             local components = vim.split(target, "#")
-            print(vim.inspect(components))
-            -- TODO allow C-o navigation, ie open a new buffer instead of replacing the contents of this one
             if #components == 2 then
               -- plain file name
               local new_buf = vim.api.nvim_create_buf(true, false)
