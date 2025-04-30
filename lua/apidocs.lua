@@ -425,8 +425,14 @@ local function apidoc_install(choice, slugs_to_mtimes, cont)
             and node:parent():parent():next_named_sibling():type() == "text" then
             name_and_id_to_string_nearby[sanitized_key][id_val] =
               vim.treesitter.get_node_text(node:parent():parent():next_named_sibling(), contents)
-            -- elseif sanitized_key:match("ForkJoinPool") then
-            --   print("can't find string for " .. id_val)
+          elseif node:parent() ~= nil and node:parent():parent() ~= nil
+            and node:parent():parent():next_named_sibling() ~= nil
+            and node:parent():parent():next_named_sibling():type() == "element"
+            and node:parent():parent():next_named_sibling():named_child_count() > 1
+            and node:parent():parent():next_named_sibling():named_children()[2]:type() == "text" then
+            -- happens with lua, but seems generic enough not to gate it
+            name_and_id_to_string_nearby[sanitized_key][id_val] =
+              vim.treesitter.get_node_text(node:parent():parent():next_named_sibling():named_children()[2], contents)
           elseif choice == "rust" and node:parent() ~= nil and node:parent():parent() ~= nil and node:parent():parent():parent() ~= nil then
             -- for rust, the node text is a little harder to find
             local elt = node:parent():parent():parent()
