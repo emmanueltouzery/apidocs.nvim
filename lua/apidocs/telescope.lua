@@ -83,6 +83,8 @@ local function telescope_attach_mappings(prompt_bufnr, map)
           load_doc_in_buffer(new_buf, common.data_folder() .. components[1] .. "#" .. components[2] .. ".html.md")
           buf_view_switch_to_new(new_buf)
           vim.cmd("/" .. components[3])
+          -- put the match at the top of the screen, then scroll up one line <C-y>
+          vim.cmd("norm! zt | ")
 
         elseif #components == 4 then
           -- file name with two hashes+section ID (happens for lua)
@@ -90,6 +92,8 @@ local function telescope_attach_mappings(prompt_bufnr, map)
           load_doc_in_buffer(new_buf, common.data_folder() .. components[1] .. "#" .. components[2] .. "#" .. components[3] .. ".html.md")
           buf_view_switch_to_new(new_buf)
           vim.cmd("/" .. components[4])
+          -- put the match at the top of the screen, then scroll up one line <C-y>
+          vim.cmd("norm! zt | ")
         end
       end
     end, {buffer = true})
