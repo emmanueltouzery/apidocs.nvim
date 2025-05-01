@@ -1,4 +1,5 @@
 local common = require("apidocs.common")
+local install = require("apidocs.install")
 
 local function load_doc_in_buffer(buf, filepath)
   if vim.fn.filereadable(filepath) == 1 then
@@ -46,7 +47,7 @@ local function telescope_attach_mappings(prompt_bufnr, map)
     local docs_path = entry.value
     if entry.filename then
       -- search
-      docs_path = entry.cwd .. "/" .. entry.filename
+      docs_path = entry.filename
     else
     end
     vim.wo.conceallevel = 2
@@ -124,14 +125,14 @@ local function apidocs_open(params, slugs_to_mtimes)
     for _, source in ipairs(params.ensure_installed) do
       if not vim.tbl_contains(installed_docs, source) then
         if slugs_to_mtimes == nil then
-          fetch_slugs_and_mtimes_and_then(function (slugs_to_mtimes)
-            apidoc_install(source, slugs_to_mtimes, function()
+          install.fetch_slugs_and_mtimes_and_then(function (slugs_to_mtimes)
+            install.apidoc_install(source, slugs_to_mtimes, function()
               apidocs_open(params, slugs_to_mtimes)
             end)
           end)
           return
         else
-          apidoc_install(source, slugs_to_mtimes, function()
+          install.apidoc_install(source, slugs_to_mtimes, function()
               apidocs_open(params, slugs_to_mtimes)
           end)
           return
@@ -244,7 +245,7 @@ local function apidocs_search(opts)
         return {}
       end,
       define_preview = function(self, entry)
-        load_doc_in_buffer(self.state.bufnr, folder .. entry.filename)
+        load_doc_in_buffer(self.state.bufnr, entry.filename)
 
         local ns = vim.api.nvim_create_namespace('my_highlights')
         vim.api.nvim_buf_set_extmark(self.state.bufnr, ns, entry.lnum-1, 0, {
