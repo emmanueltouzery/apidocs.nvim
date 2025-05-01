@@ -33,126 +33,75 @@ local function buf_view_switch_to_new(new_buf)
   end, {buffer = true})
 end
 
+local function open_doc_in_new_window(docs_path)
+  -- create a new window and use winfixbuf on it, because i'll set
+  -- conceallevel, and that's tied to the window (not the buffer),
+  -- and is very invasive
+  vim.cmd[[100vsplit]]
+  local buf = vim.api.nvim_create_buf(true, false)
+  vim.api.nvim_win_set_buf(0, buf)
+  vim.wo.conceallevel = 2
+  vim.wo.concealcursor = "n"
+  vim.wo.winfixbuf = true
+  vim.wo.list = false
+  load_doc_in_buffer(buf, docs_path)
+  vim.api.nvim_buf_set_option(0, 'modifiable', false)
+  vim.wo.wrap = false
+  vim.bo.modified = false
+
+  vim.keymap.set("n", "<C-]>", function()
+    local line = vim.api.nvim_buf_get_lines(0, vim.fn.line(".")-1, vim.fn.line("."), false)[1]
+    local m = string.match(line, "^%s+%d+%. local://")
+    if m == nil and vim.startswith(line, "\tlocal://") then
+      -- sometimes the format is not "number. link", but "number. desc\n\tlink". maybe when the link has
+      -- a description? this happens with rust
+      m = string.match(line, "^\tlocal://")
+    end
+    if m then
+      -- when parsing the local:// url, drop "<tab>+" text at the end,
+      -- we add this marker when we can't resolve the ID reference
+      local target = line:sub(#m+1):gsub("\t%+.+$", "")
+      local components = vim.split(target, "#")
+      if #components == 2 then
+        -- plain file name
+        local new_buf = vim.api.nvim_create_buf(true, false)
+        load_doc_in_buffer(new_buf, common.data_folder() .. target .. ".html.md")
+        buf_view_switch_to_new(new_buf)
+
+      elseif #components == 3 then
+        -- file name+section ID
+        local new_buf = vim.api.nvim_create_buf(true, false)
+        load_doc_in_buffer(new_buf, common.data_folder() .. components[1] .. "#" .. components[2] .. ".html.md")
+        buf_view_switch_to_new(new_buf)
+        vim.cmd("/" .. components[3])
+        -- put the match at the top of the screen, then scroll up one line <C-y>
+        vim.cmd("norm! zt | ")
+
+      elseif #components == 4 then
+        -- file name with two hashes+section ID (happens for lua)
+        local new_buf = vim.api.nvim_create_buf(true, false)
+        load_doc_in_buffer(new_buf, common.data_folder() .. components[1] .. "#" .. components[2] .. "#" .. components[3] .. ".html.md")
+        buf_view_switch_to_new(new_buf)
+        vim.cmd("/" .. components[4])
+        -- put the match at the top of the screen, then scroll up one line <C-y>
+        vim.cmd("norm! zt | ")
+      end
+    end
+  end)
+end
+
 local function telescope_attach_mappings(prompt_bufnr, map)
   local actions = require('telescope.actions')
   map('i', '<cr>', function(nr)
     actions.close(prompt_bufnr)
-    -- create a new window and use winfixbuf on it, because i'll set
-    -- conceallevel, and that's tied to the window (not the buffer),
-    -- and is very invasive
-    vim.cmd[[100vsplit]]
-    local buf = vim.api.nvim_create_buf(true, false)
-    vim.api.nvim_win_set_buf(0, buf)
     local entry = require("telescope.actions.state").get_selected_entry(prompt_bufnr)
-    local docs_path = entry.value
-    if entry.filename then
-      -- search
-      docs_path = entry.filename
-    else
-    end
-    vim.wo.conceallevel = 2
-    vim.wo.concealcursor = "n"
-    vim.wo.winfixbuf = true
-    vim.wo.list = false
-    load_doc_in_buffer(buf, docs_path)
-    vim.api.nvim_buf_set_option(0, 'modifiable', false)
-    vim.wo.wrap = false
-    vim.bo.modified = false
-
-    vim.keymap.set("n", "<C-]>", function()
-      local line = vim.api.nvim_buf_get_lines(0, vim.fn.line(".")-1, vim.fn.line("."), false)[1]
-      local m = string.match(line, "^%s+%d+%. local://")
-      if m == nil and vim.startswith(line, "\tlocal://") then
-        -- sometimes the format is not "number. link", but "number. desc\n\tlink". maybe when the link has
-        -- a description? this happens with rust
-        m = string.match(line, "^\tlocal://")
-      end
-      if m then
-        -- when parsing the local:// url, drop "<tab>+" text at the end,
-        -- we add this marker when we can't resolve the ID reference
-        local target = line:sub(#m+1):gsub("\t%+.+$", "")
-        local components = vim.split(target, "#")
-        if #components == 2 then
-          -- plain file name
-          local new_buf = vim.api.nvim_create_buf(true, false)
-          load_doc_in_buffer(new_buf, common.data_folder() .. target .. ".html.md")
-          buf_view_switch_to_new(new_buf)
-
-        elseif #components == 3 then
-          -- file name+section ID
-          local new_buf = vim.api.nvim_create_buf(true, false)
-          load_doc_in_buffer(new_buf, common.data_folder() .. components[1] .. "#" .. components[2] .. ".html.md")
-          buf_view_switch_to_new(new_buf)
-          vim.cmd("/" .. components[3])
-          -- put the match at the top of the screen, then scroll up one line <C-y>
-          vim.cmd("norm! zt | ")
-
-        elseif #components == 4 then
-          -- file name with two hashes+section ID (happens for lua)
-          local new_buf = vim.api.nvim_create_buf(true, false)
-          load_doc_in_buffer(new_buf, common.data_folder() .. components[1] .. "#" .. components[2] .. "#" .. components[3] .. ".html.md")
-          buf_view_switch_to_new(new_buf)
-          vim.cmd("/" .. components[4])
-          -- put the match at the top of the screen, then scroll up one line <C-y>
-          vim.cmd("norm! zt | ")
-        end
-      end
-    end, {buffer = true})
-  end)
+    open_doc_in_new_window(entry.value or entry.filename)
+  end, {buffer = true})
   return true
 end
 
-local function apidocs_open(params, slugs_to_mtimes)
+local function apidocs_open(params, slugs_to_mtimes, candidates)
   local docs_path = common.data_folder()
-  local fs = vim.uv.fs_scandir(docs_path)
-  local candidates = {}
-  local installed_docs = {}
-  while true do
-    local name, type = vim.uv.fs_scandir_next(fs)
-    if not name then break end
-    if type == 'directory' then
-      if params and params.restrict_sources then
-        if vim.tbl_contains(params.restrict_sources, name) then
-          table.insert(installed_docs, name)
-        end
-      else
-        table.insert(installed_docs, name)
-      end
-    end
-  end
-
-  if params and params.ensure_installed then
-    for _, source in ipairs(params.ensure_installed) do
-      if not vim.tbl_contains(installed_docs, source) then
-        if slugs_to_mtimes == nil then
-          install.fetch_slugs_and_mtimes_and_then(function (slugs_to_mtimes)
-            install.apidoc_install(source, slugs_to_mtimes, function()
-              apidocs_open(params, slugs_to_mtimes)
-            end)
-          end)
-          return
-        else
-          install.apidoc_install(source, slugs_to_mtimes, function()
-              apidocs_open(params, slugs_to_mtimes)
-          end)
-          return
-        end
-      end
-    end
-  end
-
-  for _, name in ipairs(installed_docs) do
-    local fs2 = vim.uv.fs_scandir(docs_path .. "/" .. name)
-    while true do
-      local name2, type2 = vim.uv.fs_scandir_next(fs2)
-      if not name2 then break end
-      if type2 == 'file' and vim.endswith(name2, ".html.md") then
-        local name_no_txt = name2:gsub("#.*$", "")
-        table.insert(candidates, {display = name .. "/" .. name_no_txt, path = name .. "/" .. name2})
-      end
-    end
-  end
-
   local pickers = require "telescope.pickers"
   local finders = require "telescope.finders"
   local previewers = require("telescope.previewers")
@@ -268,4 +217,5 @@ end
 return {
   apidocs_open = apidocs_open,
   apidocs_search = apidocs_search,
+  open_doc_in_new_window = open_doc_in_new_window,
 }

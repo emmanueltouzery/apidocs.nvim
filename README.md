@@ -14,8 +14,9 @@ Call `require("apidocs").setup()` when installing the plugin to register the com
 The plugin exports the following commands:
 
 - `ApidocsInstall` - will fetch the list of supported documentation sources (lua, openjdk, rust...) from devdocs.io and ask you which one you wish to install. Note that downloading+installing can take over a minute and WILL TEMPORARILY FREEZE YOUR NEOVIM. This is because the plugin leverages neovim's tree-sitter to post-process the files. This happens only when installing a source, and never again after that.
-- `ApidocsOpen` - open a picker listing all apidocs. If you want to display only a subset of sources, call the lua function: `:lua require("apidocs").apidocs_open({restrict_sources={"rust"}})`. You can also use the option `ensure_installed` to list sources that should be automatically installed. They'll be fetched next time you open the picker.
-- `ApidocsSearch` - open a picker to grep for text in all apidocs. If you want to display only a subset of sources, call the lua function: `:lua require("apidocs").apidocs_search({restrict_sources={"rust"}})`
+- `ApidocsOpen` (requires telescope.nvim) - open a picker listing all apidocs. If you want to display only a subset of sources, call the lua function: `:lua require("apidocs").apidocs_open({restrict_sources={"rust"}})`
+- `ApidocsSearch` (requires telescope.nvim) - open a picker to grep for text in all apidocs. If you want to display only a subset of sources, call the lua function: `:lua require("apidocs").apidocs_search({restrict_sources={"rust"}})`
+- `ApidocsSelect` - open a ui.select prompt listing all apidocs. If you want to display only a subset of sources, call the lua function: `:lua require("apidocs").apidocs_open({restrict_sources={"rust"}, use_ui_select=true})`
 - `ApidocsUninstall` - allows to uninstall sources. Press tab to get a completion on the available ones.
 
 ## Advanced usage
@@ -28,7 +29,7 @@ When a link takes you to a specific part of a document, you may have to press `n
 
 This plugin requires:
 
-- the telescope.nvim neovim plugin
+- the telescope.nvim neovim plugin (optional, needed for preview and search)
 - the <https://github.com/rkd77/elinks> elinks TUI browser, to convert HTML
 - ripgrep
 - curl
