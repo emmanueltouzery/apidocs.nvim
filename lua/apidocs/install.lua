@@ -527,7 +527,7 @@ end))
 end
 
 local function apidocs_install()
-  common.fetch_slugs_and_mtimes_and_then(function (slugs_to_mtimes)
+  fetch_slugs_and_mtimes_and_then(function (slugs_to_mtimes)
     local keys = vim.tbl_keys(slugs_to_mtimes)
     table.sort(keys)
     vim.ui.select(keys, {prompt="Pick a documentation to install"}, function(choice)
