@@ -110,7 +110,13 @@ local function apidocs_open(params, slugs_to_mtimes)
     local name, type = vim.uv.fs_scandir_next(fs)
     if not name then break end
     if type == 'directory' then
-      table.insert(installed_docs, name)
+      if params and params.restrict_docs then
+        if vim.tbl_contains(params.restrict_docs, name) then
+          table.insert(installed_docs, name)
+        end
+      else
+        table.insert(installed_docs, name)
+      end
     end
   end
 
@@ -205,8 +211,13 @@ local function apidocs_search(opts)
   if opts and opts.source then
     folder = folder .. opts.source .. "/"
   end
+  local search_dirs = {folder}
+  if opts and opts.restrict_docs then
+    search_dirs = vim.tbl_map(function(d) return folder .. d end, opts.restrict_docs)
+  end
   require('telescope.builtin').live_grep({
     cwd = folder,
+    search_dirs = search_dirs,
     prompt_title = "API docs search",
     previewer = previewers.new_buffer_previewer({
       -- messy because of the conceal
@@ -239,6 +250,7 @@ local function apidocs_search(opts)
         vim.api.nvim_buf_set_extmark(self.state.bufnr, ns, entry.lnum-1, 0, {
           end_line = entry.lnum,
           hl_group = 'TelescopePreviewMatch',
+          strict = false,
         })
         vim.schedule(function()
           vim.api.nvim_buf_call(self.state.bufnr, function()
