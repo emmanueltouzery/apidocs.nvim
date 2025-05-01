@@ -111,8 +111,8 @@ local function apidocs_open(params, slugs_to_mtimes)
     local name, type = vim.uv.fs_scandir_next(fs)
     if not name then break end
     if type == 'directory' then
-      if params and params.restrict_docs then
-        if vim.tbl_contains(params.restrict_docs, name) then
+      if params and params.restrict_sources then
+        if vim.tbl_contains(params.restrict_sources, name) then
           table.insert(installed_docs, name)
         end
       else
@@ -213,8 +213,8 @@ local function apidocs_search(opts)
     folder = folder .. opts.source .. "/"
   end
   local search_dirs = {folder}
-  if opts and opts.restrict_docs then
-    search_dirs = vim.tbl_map(function(d) return folder .. d end, opts.restrict_docs)
+  if opts and opts.restrict_sources then
+    search_dirs = vim.tbl_map(function(d) return folder .. d end, opts.restrict_sources)
   end
   require('telescope.builtin').live_grep({
     cwd = folder,
