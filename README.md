@@ -14,7 +14,7 @@ Call `require("apidocs").setup()` when installing the plugin to register the com
 The plugin exports the following commands:
 
 - `ApidocsInstall` - will fetch the list of supported documentation sources (lua, openjdk, rust...) from devdocs.io and ask you which one you wish to install. Note that downloading+installing can take over a minute and WILL TEMPORARILY FREEZE YOUR NEOVIM. This is because the plugin leverages neovim's tree-sitter to post-process the files. This happens only when installing a source, and never again after that.
-- `ApidocsOpen` - open a picker listing all apidocs. If you want to display only a subset of sources, call the lua function: `:lua require("apidocs").apidocs_open({restrict_sources={"rust"}})`
+- `ApidocsOpen` - open a picker listing all apidocs. If you want to display only a subset of sources, call the lua function: `:lua require("apidocs").apidocs_open({restrict_sources={"rust"}})`. You can also use the option `ensure_installed` to list sources that should be automatically installed. They'll be fetched next time you open the picker.
 - `ApidocsSearch` - open a picker to grep for text in all apidocs. If you want to display only a subset of sources, call the lua function: `:lua require("apidocs").apidocs_search({restrict_sources={"rust"}})`
 - `ApidocsUninstall` - allows to uninstall sources. Press tab to get a completion on the available ones.
 
