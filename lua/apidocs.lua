@@ -352,7 +352,7 @@ local function apidoc_install(choice, slugs_to_mtimes, cont)
       :gsub("<table", "<table border=\"1\"")
       file:write(html_extra_css(choice))
       if path_to_type[key] ~= nil then
-        file:write("> " .. path_to_type[key] .. "\n")
+        file:write("<p>&gt; " .. choice .. "/" .. path_to_type[key] .. "\n</p>\n")
       end
       file:write(contents)
       file:close()
@@ -374,8 +374,8 @@ local function apidoc_install(choice, slugs_to_mtimes, cont)
           local id_val = vim.treesitter.get_node_text(node:next_named_sibling():named_child(), contents)
           if known_keys_per_path[key] ~= nil and known_keys_per_path[key][id_val] then
             _, _, byte_pos = node:parent():parent():start()
-            name_and_id_to_pos[sanitized_key][id_val] = byte_pos
-            table.insert(name_known_byte_offsets[sanitized_key], byte_pos)
+            name_and_id_to_pos[sanitized_key][id_val] = byte_pos+1
+            table.insert(name_known_byte_offsets[sanitized_key], byte_pos+1)
           end
           if node:parent() ~= nil and node:parent():parent() ~= nil
             and node:parent():parent():next_named_sibling() ~= nil
@@ -415,9 +415,6 @@ local function apidoc_install(choice, slugs_to_mtimes, cont)
           end
         end
       end
-      -- if sanitized_key:match("ForkJoinPool") then
-      --   print(vim.inspect(name_and_id_to_string_nearby[sanitized_key]))
-      -- end
       all_reading_ids = all_reading_ids + elapsed
 
       -- need to sort offsets, later i search for the byte offset after my current one
@@ -445,7 +442,7 @@ local function apidoc_install(choice, slugs_to_mtimes, cont)
               next_byte = name_known_byte_offsets[sanitized_containing_file_name][i+1]
             end
           end
-          to_write_contents = string.sub(name_to_contents[sanitized_containing_file_name], byte, next_byte)
+          to_write_contents = string.sub(name_to_contents[sanitized_containing_file_name], byte, next_byte-1)
         end
         local sanitized_name = sanitize_fname(name)
         local out_path = sanitize_fname(sanitized_name .. "#" .. path):sub(1, 250) .. ".html"
@@ -454,7 +451,9 @@ local function apidoc_install(choice, slugs_to_mtimes, cont)
         local file = io.open(target_path .. "/" .. out_path, "w")
         file:write(html_extra_css(choice))
         if path_to_type[file_id[1]] ~= nil then
-          file:write("> " .. path_to_type[file_id[1]] .. "/" .. path_to_name[file_id[1]] .. "\n")
+          file:write("<p>&gt; " .. choice .. "/" .. path_to_type[file_id[1]] .. "/" .. path_to_name[file_id[1]] .. "\n</p>\n")
+        else
+          file:write("<p>&gt; " .. choice .. "\n</p>\n")
         end
         file:write(to_write_contents)
         file:close()
@@ -722,7 +721,6 @@ local function apidocs_open(params, slugs_to_mtimes)
             elseif #components == 4 then
               -- file name with two hashes+section ID (happens for lua)
               local new_buf = vim.api.nvim_create_buf(true, false)
-              print(data_folder() .. components[1] .. "#" .. components[2] .. "#" .. components[3] .. ".html.md")
               load_doc_in_buffer(new_buf, data_folder() .. components[1] .. "#" .. components[2] .. "#" .. components[3] .. ".html.md")
               buf_view_switch_to_new(new_buf)
               vim.cmd("/" .. components[4])
