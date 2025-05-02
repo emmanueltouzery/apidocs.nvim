@@ -321,7 +321,11 @@ local function apidoc_install(choice, slugs_to_mtimes, cont)
     for _, key in ipairs(vim.tbl_keys(data)) do
       local sanitized_key = sanitize_fname((path_to_name[key] or key) .. "#" .. key)
       out_path_to_orig_path[sanitized_key .. ".html"] = key
-      local file = io.open(target_path .. "/" .. sanitized_key  .. ".html", "w")
+      local fname = target_path .. "/" .. sanitized_key  .. ".html"
+      local file = io.open(fname, "w")
+      if file == nil then
+        print("Error opening file " .. fname)
+      end
       contents = data[key]
       :gsub("<pre([^>]*)>(.-)</pre>", function(pre_attrs, children)
         local match = pre_attrs:match("[^<>]*data%-language=\"(%w+)\"")
