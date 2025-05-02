@@ -531,16 +531,20 @@ end))
 end
 
 local function apidocs_install()
-  fetch_slugs_and_mtimes_and_then(function (slugs_to_mtimes)
-    local keys = vim.tbl_keys(slugs_to_mtimes)
-    table.sort(keys)
-    vim.ui.select(keys, {prompt="Pick a documentation to install"}, function(choice)
-      if choice == nil then
-        return
-      end
-      apidoc_install(choice, slugs_to_mtimes)
+  if vim.fn.executable("elinks") ~= 1 or vim.fn.executable("rg") ~= 1 or vim.fn.executable("find") ~= 1 then
+    print("The 'elinks', 'rg' and 'find' programs must be installed to proceed, refusing to run.")
+  else
+    fetch_slugs_and_mtimes_and_then(function (slugs_to_mtimes)
+      local keys = vim.tbl_keys(slugs_to_mtimes)
+      table.sort(keys)
+      vim.ui.select(keys, {prompt="Pick a documentation to install"}, function(choice)
+        if choice == nil then
+          return
+        end
+        apidoc_install(choice, slugs_to_mtimes)
+      end)
     end)
-  end)
+  end
 end
 
 
