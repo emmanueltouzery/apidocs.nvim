@@ -12,7 +12,7 @@ local function fetch_slugs_and_mtimes_and_then(cont)
 end
 
 local function sanitize_fname(fname)
-  return fname:gsub("/", "_"):gsub("'", "_")
+  return fname:gsub("/", "_"):gsub("'", "_"):sub(1, 255-8) -- 8 == ".html.md"
 end
 
 -- if the line contains table cells it's sensitive to alignment...
@@ -453,7 +453,7 @@ local function apidoc_install(choice, slugs_to_mtimes, cont)
           to_write_contents = string.sub(name_to_contents[sanitized_containing_file_name], byte, next_byte-1)
         end
         local sanitized_name = sanitize_fname(name)
-        local out_path = sanitize_fname(sanitized_name .. "#" .. path):sub(1, 250) .. ".html"
+        local out_path = sanitize_fname(sanitized_name .. "#" .. path) .. ".html"
         out_path_to_orig_path[out_path] = path
         out_path_to_orig_containing_path[out_path] = sanitized_containing_file_name
         local file = io.open(target_path .. "/" .. out_path, "w")
