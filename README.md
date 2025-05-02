@@ -35,6 +35,24 @@ This plugin requires:
 - curl
 - linux and probably OSX. Windows will not work, except maybe using WSL
 
+## Lazy package manager setup
+
+```lua
+return {
+  'emmanueltouzery/apidocs.nvim',
+  dependencies = {
+    'nvim-telescope/telescope.nvim',
+  },
+  cmd = { 'ApidocsSearch', 'ApidocsInstall', 'ApidocsOpen', 'ApidocsSelect', 'ApidocsUninstall' },
+  config = function()
+    require('apidocs').setup()
+  end,
+  keys = {
+    { '<leader>sad', '<cmd>ApidocsOpen<cr>', desc = 'Search Api Doc' },
+  },
+}
+```
+
 ## Extra screenshots
 
 ![basic screenshot](https://raw.githubusercontent.com/wiki/emmanueltouzery/apidocs.nvim/shot2.png)
