@@ -95,7 +95,7 @@ local function telescope_attach_mappings(prompt_bufnr, map)
   map('i', '<cr>', function(nr)
     actions.close(prompt_bufnr)
     local entry = require("telescope.actions.state").get_selected_entry(prompt_bufnr)
-    open_doc_in_new_window(entry.value or entry.filename)
+    open_doc_in_new_window(entry.filename or entry.value)
   end, {buffer = true})
   return true
 end
