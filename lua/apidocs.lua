@@ -11,8 +11,8 @@ local function apidocs_open(opts)
     local name, type = vim.uv.fs_scandir_next(fs)
     if not name then break end
     if type == 'directory' then
-      if params and params.restrict_sources then
-        if vim.tbl_contains(params.restrict_sources, name) then
+      if opts and opts.restrict_sources then
+        if vim.tbl_contains(opts.restrict_sources, name) then
           table.insert(installed_docs, name)
         end
       else
@@ -21,19 +21,19 @@ local function apidocs_open(opts)
     end
   end
 
-  if params and params.ensure_installed then
-    for _, source in ipairs(params.ensure_installed) do
+  if opts and opts.ensure_installed then
+    for _, source in ipairs(opts.ensure_installed) do
       if not vim.tbl_contains(installed_docs, source) then
         if slugs_to_mtimes == nil then
           install.fetch_slugs_and_mtimes_and_then(function (slugs_to_mtimes)
             install.apidoc_install(source, slugs_to_mtimes, function()
-              apidocs_open(params, slugs_to_mtimes)
+              apidocs_open(opts, slugs_to_mtimes)
             end)
           end)
           return
         else
           install.apidoc_install(source, slugs_to_mtimes, function()
-              apidocs_open(params, slugs_to_mtimes)
+              apidocs_open(opts, slugs_to_mtimes)
           end)
           return
         end
@@ -62,7 +62,7 @@ local function apidocs_open(opts)
       end
     end)
   else
-    telescope.apidocs_open(params, slugs_to_mtimes, candidates)
+    telescope.apidocs_open(opts, slugs_to_mtimes, candidates)
   end
 end
 
