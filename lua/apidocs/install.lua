@@ -437,34 +437,39 @@ local function apidoc_install(choice, slugs_to_mtimes, cont)
       local sanitized_fname = sanitize_fname(name)
       if #file_id == 2 then
         local sanitized_containing_file_name = sanitize_fname((path_to_name[file_id[1]] or file_id[1]) .. "#" .. file_id[1])
-        local byte = name_and_id_to_pos[sanitized_containing_file_name][file_id[2]]
-        local to_write_contents = nil
-        if byte == nil then
-          -- bad id. this happens with openjdk~8, Vector.add() for instance. Behave the same
-          -- as the devdocs UI, point to the whole file since we can't delimitate the correct subpart.
-          to_write_contents = name_to_contents[sanitized_containing_file_name]
+        if name_and_id_to_pos[sanitized_containing_file_name] == nil then
+          -- devdocs's index.json is referencing a file that the db.json doesn't contain.
+          -- this happens with bash, and we also get a 404 on devdocs.io in that case.
         else
-          local next_byte = nil
-          for i,val in ipairs(name_known_byte_offsets[sanitized_containing_file_name]) do
-            if val == byte then
-              next_byte = name_known_byte_offsets[sanitized_containing_file_name][i+1]
+          local byte = name_and_id_to_pos[sanitized_containing_file_name][file_id[2]]
+          local to_write_contents = nil
+          if byte == nil then
+            -- bad id. this happens with openjdk~8, Vector.add() for instance. Behave the same
+            -- as the devdocs UI, point to the whole file since we can't delimitate the correct subpart.
+            to_write_contents = name_to_contents[sanitized_containing_file_name]
+          else
+            local next_byte = nil
+            for i,val in ipairs(name_known_byte_offsets[sanitized_containing_file_name]) do
+              if val == byte then
+                next_byte = name_known_byte_offsets[sanitized_containing_file_name][i+1]
+              end
             end
+            to_write_contents = string.sub(name_to_contents[sanitized_containing_file_name], byte, next_byte-1)
           end
-          to_write_contents = string.sub(name_to_contents[sanitized_containing_file_name], byte, next_byte-1)
+          local sanitized_name = sanitize_fname(name)
+          local out_path = sanitize_fname(sanitized_name .. "#" .. path) .. ".html"
+          out_path_to_orig_path[out_path] = path
+          out_path_to_orig_containing_path[out_path] = sanitized_containing_file_name
+          local file = io.open(target_path .. "/" .. out_path, "w")
+          file:write(html_extra_css(choice))
+          if path_to_type[file_id[1]] ~= nil then
+            file:write("<p>&gt; " .. choice .. "/" .. path_to_type[file_id[1]] .. "/" .. path_to_name[file_id[1]] .. "\n</p>\n")
+          else
+            file:write("<p>&gt; " .. choice .. "\n</p>\n")
+          end
+          file:write(to_write_contents)
+          file:close()
         end
-        local sanitized_name = sanitize_fname(name)
-        local out_path = sanitize_fname(sanitized_name .. "#" .. path) .. ".html"
-        out_path_to_orig_path[out_path] = path
-        out_path_to_orig_containing_path[out_path] = sanitized_containing_file_name
-        local file = io.open(target_path .. "/" .. out_path, "w")
-        file:write(html_extra_css(choice))
-        if path_to_type[file_id[1]] ~= nil then
-          file:write("<p>&gt; " .. choice .. "/" .. path_to_type[file_id[1]] .. "/" .. path_to_name[file_id[1]] .. "\n</p>\n")
-        else
-          file:write("<p>&gt; " .. choice .. "\n</p>\n")
-        end
-        file:write(to_write_contents)
-        file:close()
       end
     end
     local elapsed_writing = (vim.loop.hrtime() - start_writing) / 1e9
