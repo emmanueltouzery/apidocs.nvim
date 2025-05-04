@@ -58,6 +58,15 @@ return {
 ![basic screenshot](https://raw.githubusercontent.com/wiki/emmanueltouzery/apidocs.nvim/shot2.png)
 ![basic screenshot](https://raw.githubusercontent.com/wiki/emmanueltouzery/apidocs.nvim/shot3.png)
 
+## Extension points
+
+If you wish to integrate these docs with your own scripts or another picker, you can use the following functions exported by apidocs.nvim:
+
+- `require("apidocs").data_folder()` -- the folder where the converted apidoc files can be found
+- `require("apidocs").open_doc_in_new_window(docs_path)` -- open the documentation for a specific apidoc in a new window, where conceal and links navigation is properly set up
+- `require("apidocs").open_doc_in_cur_window(docs_path)` -- open the documentation for a specific apidoc in the current window, with conceal and links navigation is properly set up. Compared to open_doc_in_new_window(), winfixbuf is not set.
+- `require("apidocs").load_doc_in_buffer(buf, docs_path)` -- open the documentation for a specific apidoc in a buffer. You must set up conceal on the window yourself (conceallevel=2, concealcursor="n"). Link navigation is not set up, this is meant for a picker's preview not standalone display.
+
 ## Credits
 
 Credits go to <https://github.com/luckasRanarison/nvim-devdocs> for the initial project which inspired this.

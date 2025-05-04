@@ -58,7 +58,7 @@ local function apidocs_open(opts)
     local path_list = vim.tbl_map(function(c) return c.path end, candidates)
     vim.ui.select(display_list, {prompt="Pick a documentation to view"}, function(item, idx)
       if item ~= nil then
-        telescope.open_doc_in_new_window(docs_path .. path_list[idx])
+        common.open_doc_in_new_window(docs_path .. path_list[idx])
       end
     end)
   else
@@ -100,4 +100,8 @@ return {
   apidocs_install = install.apidocs_install,
   apidocs_open = apidocs_open,
   apidocs_search = telescope.apidocs_search,
+  data_folder = common.data_folder,
+  open_doc_in_new_window = common.open_doc_in_new_window,
+  open_doc_in_cur_window = common.open_doc_in_cur_window,
+  load_doc_in_buffer = common.load_doc_in_buffer,
 }
