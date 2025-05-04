@@ -7,6 +7,10 @@ local function telescope_attach_mappings(prompt_bufnr, map)
     actions.close(prompt_bufnr)
     local entry = require("telescope.actions.state").get_selected_entry(prompt_bufnr)
     common.open_doc_in_new_window(entry.filename or entry.value)
+    if entry.lnum then
+      vim.cmd(":" .. entry.lnum)
+      vim.cmd("norm! zz")
+    end
   end, {buffer = true})
   return true
 end
