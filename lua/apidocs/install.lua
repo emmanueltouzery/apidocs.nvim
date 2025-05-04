@@ -479,7 +479,7 @@ local function apidoc_install(choice, slugs_to_mtimes, cont)
     local sysname = vim.loop.os_uname().sysname
     local sysspecificopts = ""
     if sysname == "Darwin" then
-      sysspecificopts = "-S1024"
+      sysspecificopts = "-S1024 "
     end
     vim.system({
       "sh", "-c",
