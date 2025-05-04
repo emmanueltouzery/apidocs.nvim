@@ -476,9 +476,14 @@ local function apidoc_install(choice, slugs_to_mtimes, cont)
 
     local start_elinks = vim.loop.hrtime()
     -- convert the html to text, on 8 processes concurrently (-P8)
+    local sysname = vim.loop.os_uname().sysname
+    local sysspecificopts = ""
+    if sysname == "Darwin" then
+      sysspecificopts = "-S1024 "
+    end
     vim.system({
       "sh", "-c",
-      [[find . -maxdepth 1 -name '*.html' -print0 | xargs -0 -P 8 -I param sh -c "elinks -config-dir ]] .. data_folder .. [[ -dump 'param' > 'param'.md && rm 'param'"]]
+      [[find . -maxdepth 1 -name '*.html' -print0 | xargs ]] .. sysspecificopts .. [[-0 -P 8 -I param sh -c "elinks -config-dir ]] .. data_folder .. [[ -dump 'param' > 'param'.md && rm 'param'"]]
       -- [[find . -maxdepth 1 -name '*.html' -print0 | xargs -0 -P 8 -I param sh -c "elinks -config-dir ]] .. data_folder .. [[ -dump 'param' > 'param'.md"]]
     }, {cwd=target_path}):wait()
     local elapsed_elinks = (vim.loop.hrtime() - start_elinks) / 1e9
