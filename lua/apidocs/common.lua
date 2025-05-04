@@ -98,6 +98,8 @@ local function open_doc_in_new_window(docs_path)
   vim.cmd[[100vsplit]]
   open_doc_in_cur_window(docs_path)
   vim.wo.winfixbuf = true
+  local desc = vim.split(docs_path:match("([^/]+)$"), "#")[1]
+  vim.api.nvim_buf_set_name(0, desc)
 end
 
 
