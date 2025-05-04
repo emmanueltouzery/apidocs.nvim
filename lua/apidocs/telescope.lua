@@ -157,6 +157,7 @@ end
 
 local function apidocs_search(opts)
   local previewers = require("telescope.previewers")
+  local make_entry = require "telescope.make_entry"
   local folder = common.data_folder()
   if opts and opts.source then
     folder = folder .. opts.source .. "/"
@@ -165,10 +166,29 @@ local function apidocs_search(opts)
   if opts and opts.restrict_sources then
     search_dirs = vim.tbl_map(function(d) return folder .. d end, opts.restrict_sources)
   end
+
+
+  local default_entry_maker = make_entry.gen_from_vimgrep()
+  local function entry_maker(entry)
+    local r = default_entry_maker(entry)
+      r.display = function(entry)
+        local entry_components = vim.split(entry.filename:sub(#folder+1), "#")
+        local source_length = entry_components[1]:find("/")
+        local hl_group = {
+          { {0, source_length}, "TelescopeResultsTitle"},
+          { {source_length, #entry_components[1]}, "TelescopeResultsMethod" },
+          { {#entry_components[1], #entry_components[1] + #(tostring(entry.lnum))+2}, "TelescopeResultsLineNr" },
+        }
+        return string.format("%s:%d: %s", entry_components[1], entry.lnum, entry.text), hl_group
+      end
+    return r
+  end
+
   require('telescope.builtin').live_grep({
     cwd = folder,
     search_dirs = search_dirs,
     prompt_title = "API docs search",
+    entry_maker = entry_maker,
     previewer = previewers.new_buffer_previewer({
       -- messy because of the conceal
       setup = function(self)
