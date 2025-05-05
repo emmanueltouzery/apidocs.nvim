@@ -28,6 +28,7 @@ local function get_data_dir(opts)
 end
 
 local function format_entries(item, picker)
+	vim.notify(vim.inspect(item), vim.log.levels.DEBUG, { title = "Snacks" })
 	local parts = vim.split(item.file, "/")
 	-- take the last part and set it as the text
 	local folder = parts[#parts - 1]
@@ -90,7 +91,7 @@ local function apidocs_search(opts)
 		dirs = { get_data_dir(opts) },
 		ft = { "markdown", "md" },
 		confirm = function(picker, item)
-			require("apidocs").search_doc_in_new_window(item.file)
+			require("apidocs").open_doc_in_new_window(item.file)
 		end,
 		format = format_entries,
 	})
