@@ -29,7 +29,6 @@ local function get_data_dir(opts)
 end
 
 local function format_entries(item, picker)
-	vim.notify(vim.inspect(item), vim.log.levels.DEBUG, { title = "Snacks" })
 	local parts = vim.split(item.file, "/")
 	-- take the last part and set it as the text
 	local folder = parts[#parts - 1]
