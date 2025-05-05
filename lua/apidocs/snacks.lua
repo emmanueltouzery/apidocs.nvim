@@ -25,6 +25,7 @@ local function get_data_dir(opts)
 	if opts and opts.source then
 		data_dir = data_dir .. opts.source .. "/"
 	end
+	return data_dir
 end
 
 local function format_entries(item, picker)
