@@ -1,7 +1,5 @@
 local common = require("apidocs.common")
 local install = require("apidocs.install")
-local telescope = require("apidocs.telescope")
-local snacks = require("apidocs.snacks")
 
 Config = {}
 
@@ -71,7 +69,7 @@ local function apidocs_open(opts)
   end
 
   if picker == "snacks" then
-    snacks.apidocs_open(opts)
+    require("apidocs.snacks").apidocs_open(opts)
     return
   end
 
@@ -102,7 +100,7 @@ local function apidocs_open(opts)
       end
     end)
   else
-    telescope.apidocs_open(opts, slugs_to_mtimes, candidates)
+    require("apidocs.telescope").apidocs_open(opts, slugs_to_mtimes, candidates)
   end
 end
 
@@ -116,11 +114,11 @@ local function apidocs_search(opts)
     return
   end
   if picker == "snacks" then
-    snacks.apidocs_search(opts)
+    require("apidocs.snacks").apidocs_search(opts)
     return
   end
   if picker == "telescope" then
-    telescope.apidocs_search(opts)
+    require("apidocs.telescope").apidocs_search(opts)
     return
   end
 end
