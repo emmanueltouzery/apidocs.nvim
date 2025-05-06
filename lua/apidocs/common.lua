@@ -94,10 +94,12 @@ end
 local function open_doc_in_new_window(docs_path)
   -- create a new window and use winfixbuf on it, because i'll set
   -- conceallevel, and that's tied to the window (not the buffer),
-  -- and is very invasive
+  -- and is very invasive. bufhidden is to enable us to close the window
+  -- and have the buffer be closed too -- further tying window & buffer together.
   vim.cmd[[100vsplit]]
   open_doc_in_cur_window(docs_path)
   vim.wo.winfixbuf = true
+  vim.bo.bufhidden = 'delete'
   local desc = vim.split(docs_path:match("([^/]+)$"), "#")[1]
   vim.api.nvim_buf_set_name(0, desc)
 end
