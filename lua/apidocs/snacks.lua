@@ -59,22 +59,11 @@ local function format_entries(item, picker)
     },
   }
   local fileNameParts = vim.split(filename, "#")
-  -- loop through the parts and add them to the new_item
-  for i = 1, #fileNameParts do
-    local part = fileNameParts[i]
-    new_item[#new_item + 1] = {
-      part,
-      "SnacksPickerFile",
-      field = "file",
-    }
-    if i < #fileNameParts then
-      new_item[#new_item + 1] = {
-        " > ",
-        "SnacksPickerDelim",
-        field = "file",
-      }
-    end
-  end
+  new_item[#new_item + 1] = {
+    fileNameParts[1],
+    "SnacksPickerFile",
+    field = "file",
+  }
   return new_item
 end
 
