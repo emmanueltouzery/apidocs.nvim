@@ -20,12 +20,19 @@ local common_win_options = {
   },
 }
 
-local function get_data_dir(opts)
+local function get_data_dirs(opts)
   local data_dir = common.data_folder()
-  if opts and opts.source then
-    data_dir = data_dir .. opts.source .. "/"
+  if not (opts and opts.restrict_sources) then
+    return { data_dir }
   end
-  return data_dir
+  local dirs = {}
+  for _, source in ipairs(opts.restrict_sources) do
+    local dir = data_dir .. source .. "/"
+    if vim.fn.isdirectory(dir) == 1 then
+      table.insert(dirs, dir)
+    end
+  end
+  return dirs
 end
 
 local function format_entries(item, picker)
@@ -75,7 +82,7 @@ local function apidocs_open(opts)
   Snacks.picker.files({
     layout = common_layout_options,
     win = common_win_options,
-    dirs = { get_data_dir(opts) },
+    dirs = get_data_dirs(opts),
     ft = { "markdown", "md" },
     confirm = function(picker, item)
       require("apidocs").open_doc_in_new_window(item.file)
@@ -88,7 +95,7 @@ local function apidocs_search(opts)
   Snacks.picker.grep({
     layout = common_layout_options,
     win = common_win_options,
-    dirs = { get_data_dir(opts) },
+    dirs = get_data_dirs(opts),
     ft = { "markdown", "md" },
     confirm = function(picker, item)
       require("apidocs").open_doc_in_new_window(item.file)

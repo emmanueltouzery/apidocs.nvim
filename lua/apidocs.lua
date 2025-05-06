@@ -29,10 +29,7 @@ local function apidocs_open(opts)
   if opts and opts.picker then
     picker = opts.picker
   end
-  if picker == "snacks" then
-    snacks.apidocs_open(opts)
-    return
-  end
+
   local docs_path = common.data_folder()
   local fs = vim.uv.fs_scandir(docs_path)
   local candidates = {}
@@ -71,6 +68,11 @@ local function apidocs_open(opts)
         end
       end
     end
+  end
+
+  if picker == "snacks" then
+    snacks.apidocs_open(opts)
+    return
   end
 
   for _, name in ipairs(installed_docs) do
