@@ -258,6 +258,18 @@ local function html_extra_css(source)
   end
 end
 
+local function apply_source_specific_workarounds(source, contents)
+  if source == "dom" then
+    -- dom/Clipboard.read for instance has text like ["text", "text2"], and we parse it
+    -- as markdown links. But it's multiline in table columns and it looks horrible.
+    local res = contents
+      :gsub("%[\"", "{\"") -- [" -> {"
+      :gsub("\"%]", "\"}") -- "] -> "}
+    return res
+  end
+  return contents
+end
+
 local function apidoc_install(choice, slugs_to_mtimes, cont)
   vim.notify("Fetching documentation for " .. choice)
   local data_folder = common.data_folder()
@@ -362,7 +374,7 @@ local function apidoc_install(choice, slugs_to_mtimes, cont)
       if path_to_type[key] ~= nil then
         file:write("<p>&gt; " .. choice .. "/" .. path_to_type[key] .. "\n</p>\n")
       end
-      file:write(contents)
+      file:write(apply_source_specific_workarounds(choice, contents))
       file:close()
 
       local start_parse = vim.loop.hrtime()
