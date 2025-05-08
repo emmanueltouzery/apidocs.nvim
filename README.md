@@ -44,11 +44,20 @@ return {
     'nvim-telescope/telescope.nvim', -- or, 'folke/snacks.nvim'
   },
   cmd = { 'ApidocsSearch', 'ApidocsInstall', 'ApidocsOpen', 'ApidocsSelect', 'ApidocsUninstall' },
+  -- If using ensure_installed (see below), uncomment the next line to trigger the
+  -- installation when Neovim is opened
+  -- lazy = false
   config = function()
-    require('apidocs').setup()
-    -- Picker will be auto-detected. To select a picker of your choice explicitly you can set picker by the configuration option 'picker':
-    -- require('apidocs').setup({picker = "snacks"})
-    -- Possible options are 'ui_select', 'telescope', and 'snacks'
+    local opts = {
+      -- Picker will be auto-detected. To select a picker of your choice explicitly you can set picker by the configuration option 'picker':
+      -- Possible options are 'ui_select', 'telescope', and 'snacks'
+      picker = "telescope",
+      -- Use the below to make sure documentations for your languages are installed
+      -- Note: best used with `lazy = false` (see above)
+      -- ensure_installed = { "lua~5.4" }
+
+    }
+    require('apidocs').setup(opts)
   end,
   keys = {
     { '<leader>sad', '<cmd>ApidocsOpen<cr>', desc = 'Search Api Doc' },

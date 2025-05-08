@@ -3,6 +3,45 @@ local install = require("apidocs.install")
 
 Config = {}
 
+local function get_installed_docs(fs, opts)
+  local installed_docs = {}
+  while true do
+    local name, type = vim.uv.fs_scandir_next(fs)
+    if not name then
+      break
+    end
+    if type == "directory" then
+      if opts and opts.restrict_sources then
+        if vim.tbl_contains(opts.restrict_sources, name) then
+          table.insert(installed_docs, name)
+        end
+      else
+        table.insert(installed_docs, name)
+      end
+    end
+  end
+  return installed_docs
+end
+
+local function ensure_installed(opts)
+  local docs_path = common.data_folder()
+  local fs = vim.uv.fs_scandir(docs_path)
+  local installed_docs = get_installed_docs(fs, opts)
+  if opts and opts.ensure_installed then
+    for _, source in ipairs(opts.ensure_installed) do
+      if not vim.tbl_contains(installed_docs, source) then
+        if slugs_to_mtimes == nil then
+          install.fetch_slugs_and_mtimes_and_then(function(slugs_to_mtimes)
+            install.apidoc_install(source, slugs_to_mtimes)
+          end)
+        else
+          install.apidoc_install(source, slugs_to_mtimes)
+        end
+      end
+    end
+  end
+end
+
 local function set_picker(opts)
   if opts and (opts.picker == "snacks" or opts.picker == "telescope" or opts.picker == "ui_select") then
     return opts
@@ -31,22 +70,7 @@ local function apidocs_open(opts)
   local docs_path = common.data_folder()
   local fs = vim.uv.fs_scandir(docs_path)
   local candidates = {}
-  local installed_docs = {}
-  while true do
-    local name, type = vim.uv.fs_scandir_next(fs)
-    if not name then
-      break
-    end
-    if type == "directory" then
-      if opts and opts.restrict_sources then
-        if vim.tbl_contains(opts.restrict_sources, name) then
-          table.insert(installed_docs, name)
-        end
-      else
-        table.insert(installed_docs, name)
-      end
-    end
-  end
+  local installed_docs = get_installed_docs(fs, opts)
 
   if opts and opts.ensure_installed then
     for _, source in ipairs(opts.ensure_installed) do
@@ -129,6 +153,7 @@ end
 
 local function setup(conf)
   set_config(conf)
+  ensure_installed(conf)
   vim.api.nvim_create_user_command("ApidocsInstall", install.apidocs_install, {})
   vim.api.nvim_create_user_command("ApidocsOpen", apidocs_open, {})
   vim.api.nvim_create_user_command("ApidocsSearch", apidocs_search, {})
