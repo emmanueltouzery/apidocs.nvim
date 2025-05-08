@@ -5,6 +5,9 @@ Config = {}
 
 local function get_installed_docs(fs, opts)
   local installed_docs = {}
+  if fs == nil then
+    return installed_docs
+  end
   while true do
     local name, type = vim.uv.fs_scandir_next(fs)
     if not name then
