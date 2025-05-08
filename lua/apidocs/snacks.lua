@@ -26,10 +26,17 @@ local function get_data_dirs(opts)
     return { data_dir }
   end
   local dirs = {}
+  local install_dirs = vim.fn.readdir(data_dir)
   for _, source in ipairs(opts.restrict_sources) do
-    local dir = data_dir .. source .. "/"
-    if vim.fn.isdirectory(dir) == 1 then
-      table.insert(dirs, dir)
+    for _, entry in ipairs(install_dirs) do
+      if vim.fn.isdirectory(data_dir .. entry) == 1 then
+        if entry == source then
+          table.insert(dirs, data_dir .. entry .. "/")
+        elseif entry:match("^" .. source) then
+          -- no exact match found, check for a partial match
+          table.insert(dirs, data_dir .. entry .. "/")
+        end
+      end
     end
   end
   return dirs

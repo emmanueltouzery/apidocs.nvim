@@ -2,8 +2,8 @@ local common = require("apidocs.common")
 local install = require("apidocs.install")
 
 local function telescope_attach_mappings(prompt_bufnr, map)
-  local actions = require('telescope.actions')
-  map('i', '<cr>', function(nr)
+  local actions = require("telescope.actions")
+  map("i", "<cr>", function(nr)
     actions.close(prompt_bufnr)
     local entry = require("telescope.actions.state").get_selected_entry(prompt_bufnr)
     common.open_doc_in_new_window(entry.filename or entry.value)
@@ -11,14 +11,14 @@ local function telescope_attach_mappings(prompt_bufnr, map)
       vim.cmd(":" .. entry.lnum)
       vim.cmd("norm! zz")
     end
-  end, {buffer = true})
+  end, { buffer = true })
   return true
 end
 
 local function apidocs_open(params, slugs_to_mtimes, candidates)
   local docs_path = common.data_folder()
-  local pickers = require "telescope.pickers"
-  local finders = require "telescope.finders"
+  local pickers = require("telescope.pickers")
+  local finders = require("telescope.finders")
   local previewers = require("telescope.previewers")
   local conf = require("telescope.config").values
 
@@ -31,75 +31,88 @@ local function apidocs_open(params, slugs_to_mtimes, candidates)
     }
   end
 
-  pickers.new({}, {
-    prompt_title = "API docs",
-    finder = finders.new_table {
-      results = candidates,
-      entry_maker = entry_maker
-    },
-    previewer = previewers.new_buffer_previewer({
-      -- messy because of the conceal
-      setup = function(self)
-        vim.schedule(function()
-          local winid = self.state.winid
-          vim.wo[winid].conceallevel = 2
-          vim.wo[winid].concealcursor = "n"
-          local augroup = vim.api.nvim_create_augroup('TelescopeApiDocsResumeConceal', { clear = true })
-          vim.api.nvim_create_autocmd({"User"}, {
-            group = augroup,
-            pattern = "TelescopeResumePost",
-            callback = function()
-              local action_state = require("telescope.actions.state")
-              local current_picker = action_state.get_current_picker(vim.api.nvim_get_current_buf())
-              if current_picker.prompt_title == "API docs" or current_picker.prompt_title == "API docs search" then
-                local winid = current_picker.all_previewers[1].state.winid
-                vim.wo[winid].conceallevel = 2
-                vim.wo[winid].concealcursor = "n"
-              end
-            end
-          })
-        end)
-        return {}
-      end,
-      define_preview = function(self, entry)
-        common.load_doc_in_buffer(self.state.bufnr, entry.value)
-      end,
-    }),
-    sorter = conf.generic_sorter({}),
-    attach_mappings = telescope_attach_mappings,
-  }):find()
+  pickers
+    .new({}, {
+      prompt_title = "API docs",
+      finder = finders.new_table({
+        results = candidates,
+        entry_maker = entry_maker,
+      }),
+      previewer = previewers.new_buffer_previewer({
+        -- messy because of the conceal
+        setup = function(self)
+          vim.schedule(function()
+            local winid = self.state.winid
+            vim.wo[winid].conceallevel = 2
+            vim.wo[winid].concealcursor = "n"
+            local augroup = vim.api.nvim_create_augroup("TelescopeApiDocsResumeConceal", { clear = true })
+            vim.api.nvim_create_autocmd({ "User" }, {
+              group = augroup,
+              pattern = "TelescopeResumePost",
+              callback = function()
+                local action_state = require("telescope.actions.state")
+                local current_picker = action_state.get_current_picker(vim.api.nvim_get_current_buf())
+                if current_picker.prompt_title == "API docs" or current_picker.prompt_title == "API docs search" then
+                  local winid = current_picker.all_previewers[1].state.winid
+                  vim.wo[winid].conceallevel = 2
+                  vim.wo[winid].concealcursor = "n"
+                end
+              end,
+            })
+          end)
+          return {}
+        end,
+        define_preview = function(self, entry)
+          common.load_doc_in_buffer(self.state.bufnr, entry.value)
+        end,
+      }),
+      sorter = conf.generic_sorter({}),
+      attach_mappings = telescope_attach_mappings,
+    })
+    :find()
 end
 
 local function apidocs_search(opts)
   local previewers = require("telescope.previewers")
-  local make_entry = require "telescope.make_entry"
+  local make_entry = require("telescope.make_entry")
   local folder = common.data_folder()
   if opts and opts.source then
     folder = folder .. opts.source .. "/"
   end
-  local search_dirs = {folder}
+  local search_dirs = {}
   if opts and opts.restrict_sources then
-    search_dirs = vim.tbl_map(function(d) return folder .. d end, opts.restrict_sources)
+    local install_dirs = vim.fn.readdir(folder)
+    for _, source in ipairs(opts.restrict_sources) do
+      for _, entry in ipairs(install_dirs) do
+        if vim.fn.isdirectory(folder .. entry) == 1 then
+          if entry == source then
+            table.insert(search_dirs, folder .. entry .. "/")
+          elseif entry:match("^" .. source) then
+            -- no exact match found, check for a partial match
+            table.insert(search_dirs, folder .. entry .. "/")
+          end
+        end
+      end
+    end
   end
-
 
   local default_entry_maker = make_entry.gen_from_vimgrep()
   local function entry_maker(entry)
     local r = default_entry_maker(entry)
-      r.display = function(entry)
-        local entry_components = vim.split(entry.filename:sub(#folder+1), "#")
-        local source_length = entry_components[1]:find("/")
-        local hl_group = {
-          { {0, source_length}, "TelescopeResultsTitle"},
-          { {source_length, #entry_components[1]}, "TelescopeResultsMethod" },
-          { {#entry_components[1], #entry_components[1] + #(tostring(entry.lnum))+2}, "TelescopeResultsLineNr" },
-        }
-        return string.format("%s:%d: %s", entry_components[1], entry.lnum, entry.text), hl_group
-      end
+    r.display = function(entry)
+      local entry_components = vim.split(entry.filename:sub(#folder + 1), "#")
+      local source_length = entry_components[1]:find("/")
+      local hl_group = {
+        { { 0, source_length }, "TelescopeResultsTitle" },
+        { { source_length, #entry_components[1] }, "TelescopeResultsMethod" },
+        { { #entry_components[1], #entry_components[1] + #(tostring(entry.lnum)) + 2 }, "TelescopeResultsLineNr" },
+      }
+      return string.format("%s:%d: %s", entry_components[1], entry.lnum, entry.text), hl_group
+    end
     return r
   end
 
-  require('telescope.builtin').live_grep({
+  require("telescope.builtin").live_grep({
     cwd = folder,
     search_dirs = search_dirs,
     prompt_title = "API docs search",
@@ -111,8 +124,8 @@ local function apidocs_search(opts)
           local winid = self.state.winid
           vim.wo[winid].conceallevel = 2
           vim.wo[winid].concealcursor = "n"
-          local augroup = vim.api.nvim_create_augroup('TelescopeApiDocsResumeConceal', { clear = true })
-          vim.api.nvim_create_autocmd({"User"}, {
+          local augroup = vim.api.nvim_create_augroup("TelescopeApiDocsResumeConceal", { clear = true })
+          vim.api.nvim_create_autocmd({ "User" }, {
             group = augroup,
             pattern = "TelescopeResumePost",
             callback = function()
@@ -123,7 +136,7 @@ local function apidocs_search(opts)
                 vim.wo[winid].conceallevel = 2
                 vim.wo[winid].concealcursor = "n"
               end
-            end
+            end,
           })
         end)
         return {}
@@ -131,10 +144,10 @@ local function apidocs_search(opts)
       define_preview = function(self, entry)
         common.load_doc_in_buffer(self.state.bufnr, entry.filename)
 
-        local ns = vim.api.nvim_create_namespace('my_highlights')
-        vim.api.nvim_buf_set_extmark(self.state.bufnr, ns, entry.lnum-1, 0, {
+        local ns = vim.api.nvim_create_namespace("my_highlights")
+        vim.api.nvim_buf_set_extmark(self.state.bufnr, ns, entry.lnum - 1, 0, {
           end_line = entry.lnum,
-          hl_group = 'TelescopePreviewMatch',
+          hl_group = "TelescopePreviewMatch",
           strict = false,
         })
         vim.schedule(function()
