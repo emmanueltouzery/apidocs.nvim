@@ -61,6 +61,14 @@ return {
   end,
   keys = {
     { '<leader>sad', '<cmd>ApidocsOpen<cr>', desc = 'Search Api Doc' },
+    {
+      '<leader>sac',
+      function()
+        local lang = vim.bo.filetype
+        require("apidocs").apidocs_search({ restrict_sources = { lang } })
+      end,
+      desc = 'Search Api Doc (restricted to current file type)'
+    },
   },
 }
 ```

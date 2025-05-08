@@ -12,8 +12,10 @@ local function get_installed_docs(fs, opts)
     end
     if type == "directory" then
       if opts and opts.restrict_sources then
-        if vim.tbl_contains(opts.restrict_sources, name) then
-          table.insert(installed_docs, name)
+        for _, source in ipairs(opts.restrict_sources) do
+          if name:match("^" .. source) then
+            table.insert(installed_docs, name)
+          end
         end
       else
         table.insert(installed_docs, name)
