@@ -72,6 +72,30 @@ local function apidocs_open(params, slugs_to_mtimes, candidates)
     :find()
 end
 
+local function get_data_dirs(opts)
+  local data_dir = common.data_folder()
+  if not (opts and opts.restrict_sources) then
+    return { data_dir }
+  end
+  local dirs = {}
+  local install_dirs = vim.fn.readdir(data_dir)
+  for _, source in ipairs(opts.restrict_sources) do
+    local dir = data_dir .. source .. "/"
+    if vim.fn.isdirectory(dir) == 1 then
+      table.insert(dirs, dir)
+    else
+      for _, entry in ipairs(install_dirs) do
+        if entry:match("^" .. source .. "~%d+") then
+          -- check for partial match
+          -- e.g. "python" -> "python~3.12"
+          table.insert(dirs, data_dir .. entry .. "/")
+        end
+      end
+    end
+  end
+  return dirs
+end
+
 local function apidocs_search(opts)
   local previewers = require("telescope.previewers")
   local make_entry = require("telescope.make_entry")
@@ -79,23 +103,7 @@ local function apidocs_search(opts)
   if opts and opts.source then
     folder = folder .. opts.source .. "/"
   end
-  local search_dirs = { folder }
-  if opts and opts.restrict_sources then
-    local install_dirs = vim.fn.readdir(folder)
-    for _, source in ipairs(opts.restrict_sources) do
-      for _, entry in ipairs(install_dirs) do
-        if vim.fn.isdirectory(folder .. entry) == 1 then
-          if entry == source then
-            table.insert(search_dirs, folder .. entry .. "/")
-          elseif entry:match("^" .. source .. "~%d+(%.%d+)?$") then
-            -- check for partial match
-            -- e.g. "python" -> "python~3.12"
-            table.insert(search_dirs, folder .. entry .. "/")
-          end
-        end
-      end
-    end
-  end
+  local search_dirs = get_data_dirs(opts)
 
   local default_entry_maker = make_entry.gen_from_vimgrep()
   local function entry_maker(entry)
