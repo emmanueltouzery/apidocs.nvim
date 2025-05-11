@@ -22,16 +22,13 @@ local function set_picker(opts)
   return opts
 end
 
-local function apidocs_open(opts)
-  local picker = Config.picker
-  if opts and opts.picker then
-    picker = opts.picker
-  end
-
+local function get_installed_docs(opts)
   local docs_path = common.data_folder()
   local fs = vim.uv.fs_scandir(docs_path)
-  local candidates = {}
   local installed_docs = {}
+  if fs == nil then
+    return installed_docs
+  end
   while true do
     local name, type = vim.uv.fs_scandir_next(fs)
     if not name then
@@ -47,25 +44,44 @@ local function apidocs_open(opts)
       end
     end
   end
+  return installed_docs
+end
 
-  if opts and opts.ensure_installed then
-    for _, source in ipairs(opts.ensure_installed) do
-      if not vim.tbl_contains(installed_docs, source) then
-        if slugs_to_mtimes == nil then
-          install.fetch_slugs_and_mtimes_and_then(function(slugs_to_mtimes)
-            install.apidoc_install(source, slugs_to_mtimes, function()
-              apidocs_open(opts, slugs_to_mtimes)
-            end)
-          end)
-          return
-        else
+local apidocs_open -- forward declaration
+
+local function apidocs_ensure_install(opts)
+  local installed_docs = get_installed_docs(opts)
+  for _, source in ipairs(opts.ensure_installed) do
+    if not vim.tbl_contains(installed_docs, source) then
+      if slugs_to_mtimes == nil then
+        install.fetch_slugs_and_mtimes_and_then(function(slugs_to_mtimes)
           install.apidoc_install(source, slugs_to_mtimes, function()
             apidocs_open(opts, slugs_to_mtimes)
           end)
-          return
-        end
+        end)
+        return
+      else
+        install.apidoc_install(source, slugs_to_mtimes, function()
+          apidocs_open(opts, slugs_to_mtimes)
+        end)
+        return
       end
     end
+  end
+end
+
+function apidocs_open(opts)
+  local picker = Config.picker
+  if opts and opts.picker then
+    picker = opts.picker
+  end
+
+  local docs_path = common.data_folder()
+  local candidates = {}
+  local installed_docs = get_installed_docs(opts)
+
+  if opts and opts.ensure_installed then
+    apidocs_ensure_install(opts)
   end
 
   if picker == "snacks" then
@@ -166,6 +182,7 @@ return {
   apidocs_install = install.apidocs_install,
   apidocs_open = apidocs_open,
   apidocs_search = apidocs_search,
+  apidocs_ensure_install = apidocs_ensure_install,
   data_folder = common.data_folder,
   open_doc_in_new_window = common.open_doc_in_new_window,
   open_doc_in_cur_window = common.open_doc_in_cur_window,
