@@ -55,15 +55,11 @@ local function apidocs_ensure_install(languages)
     if not vim.tbl_contains(installed_docs, source) then
       if slugs_to_mtimes == nil then
         install.fetch_slugs_and_mtimes_and_then(function(slugs_to_mtimes)
-          install.apidoc_install(source, slugs_to_mtimes, function()
-            apidocs_open(opts, slugs_to_mtimes)
-          end)
+          install.apidoc_install(source, slugs_to_mtimes)
         end)
         return
       else
-        install.apidoc_install(source, slugs_to_mtimes, function()
-          apidocs_open(opts, slugs_to_mtimes)
-        end)
+        install.apidoc_install(source, slugs_to_mtimes)
         return
       end
     end
