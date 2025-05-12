@@ -49,9 +49,9 @@ end
 
 local apidocs_open -- forward declaration
 
-local function apidocs_ensure_install(opts)
-  local installed_docs = get_installed_docs(opts)
-  for _, source in ipairs(opts.ensure_installed) do
+local function apidocs_ensure_install(languages)
+  local installed_docs = get_installed_docs()
+  for _, source in ipairs(languages) do
     if not vim.tbl_contains(installed_docs, source) then
       if slugs_to_mtimes == nil then
         install.fetch_slugs_and_mtimes_and_then(function(slugs_to_mtimes)
@@ -81,7 +81,7 @@ function apidocs_open(opts)
   local installed_docs = get_installed_docs(opts)
 
   if opts and opts.ensure_installed then
-    apidocs_ensure_install(opts)
+    apidocs_ensure_install(opts.ensure_installed)
   end
 
   if picker == "snacks" then
