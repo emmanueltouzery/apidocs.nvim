@@ -49,7 +49,7 @@ end
 
 local apidocs_open -- forward declaration
 
-local function apidocs_ensure_install(languages)
+local function ensure_install(languages)
   local installed_docs = get_installed_docs()
   for _, source in ipairs(languages) do
     if not vim.tbl_contains(installed_docs, source) then
@@ -77,7 +77,7 @@ function apidocs_open(opts)
   local installed_docs = get_installed_docs(opts)
 
   if opts and opts.ensure_installed then
-    apidocs_ensure_install(opts.ensure_installed)
+    ensure_install(opts.ensure_installed)
   end
 
   if picker == "snacks" then
@@ -178,7 +178,7 @@ return {
   apidocs_install = install.apidocs_install,
   apidocs_open = apidocs_open,
   apidocs_search = apidocs_search,
-  apidocs_ensure_install = apidocs_ensure_install,
+  ensure_install = ensure_install,
   data_folder = common.data_folder,
   open_doc_in_new_window = common.open_doc_in_new_window,
   open_doc_in_cur_window = common.open_doc_in_cur_window,
