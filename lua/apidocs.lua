@@ -95,8 +95,6 @@ function apidocs_open(opts)
     picker = opts.picker
   end
 
-  local docs_path = common.data_folder()
-  local candidates = {}
   local installed_docs = get_installed_docs(opts)
 
   if opts and opts.ensure_installed then
@@ -114,6 +112,8 @@ function apidocs_open(opts)
     return
   end
 
+  local docs_path = common.data_folder()
+  local candidates = {}
   for _, name in ipairs(installed_docs) do
     local fs2 = vim.uv.fs_scandir(docs_path .. "/" .. name)
     while true do
