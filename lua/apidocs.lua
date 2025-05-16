@@ -96,12 +96,13 @@ function apidocs_open(opts)
   local installed_docs = get_installed_docs(opts)
 
   if opts and opts.ensure_installed then
-    return ensure_install_and_then(opts.ensure_installed, function()
+    ensure_install_and_then(opts.ensure_installed, function()
       -- call apidocs_open() again, but remove ensure_installed from opts
       -- otherwise this would loop infinitely
       local new_opts = { picker = opts.picker }
       apidocs_open(new_opts)
     end)
+    return
   end
 
   if picker == "snacks" then
