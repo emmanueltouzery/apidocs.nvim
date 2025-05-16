@@ -51,31 +51,35 @@ local apidocs_open -- forward declaration
 
 local function ensure_install_and_then(languages, cont)
   local installed_docs = get_installed_docs()
-  local pending_installation = 0
-  -- count items to install
+  local needs_install = {}
   for _, source in ipairs(languages) do
     if not vim.tbl_contains(installed_docs, source) then
-      pending_installation = pending_installation + 1
+      table.insert(needs_install, source)
     end
   end
 
-  local function after_install()
-    pending_installation = pending_installation - 1
-    if pending_installation == 0 then
+  -- if no items left to install, just call cont()
+  if next(needs_install) == nil then
+    install.fetch_slugs_and_mtimes_and_then(function(slugs_to_mtimes)
       cont(slugs_to_mtimes)
-    end
+    end)
+    return
   end
 
-  for _, source in ipairs(languages) do
-    if not vim.tbl_contains(installed_docs, source) then
-      if slugs_to_mtimes == nil then
-        install.fetch_slugs_and_mtimes_and_then(function(slugs_to_mtimes)
-          install.apidoc_install(source, slugs_to_mtimes, after_install)
-        end)
-      else
-        install.apidoc_install(source, slugs_to_mtimes, after_install)
-      end
-    end
+  local function call_again()
+    -- gets passed to apidoc_install() so that ensure_install_and_then
+    -- is called again until all languages are installed
+    ensure_install_and_then(languages, cont)
+  end
+
+  -- install first item from needs_install, then call function again
+  local _, to_install = next(needs_install)
+  if slugs_to_mtimes == nil then
+    install.fetch_slugs_and_mtimes_and_then(function(slugs_to_mtimes)
+      install.apidoc_install(to_install, slugs_to_mtimes, call_again)
+    end)
+  else
+    install.apidoc_install(to_install, slugs_to_mtimes, call_again)
   end
 end
 
