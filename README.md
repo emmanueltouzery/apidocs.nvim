@@ -69,6 +69,7 @@ If you wish to integrate these docs with your own scripts or another picker, you
 - `require("apidocs").open_doc_in_new_window(docs_path)` -- open the documentation for a specific apidoc in a new window, where conceal and links navigation is properly set up
 - `require("apidocs").open_doc_in_cur_window(docs_path)` -- open the documentation for a specific apidoc in the current window, with conceal and links navigation is properly set up. Compared to open_doc_in_new_window(), winfixbuf is not set.
 - `require("apidocs").load_doc_in_buffer(buf, docs_path)` -- open the documentation for a specific apidoc in a buffer. You must set up conceal on the window yourself (conceallevel=2, concealcursor="n"). Link navigation is not set up, this is meant for a picker's preview not standalone display.
+- `require("apidocs").ensure_install(langs)` -- install all languages in the provided array. E.g. if `langs` is `{ "lua~5.4", "rust" }` then the docs for Lua 5.4 and Rust will be installed. You can call this function after `setup()` in your configuration to ensure that your desired languages are available.
 
 ## Credits
 
