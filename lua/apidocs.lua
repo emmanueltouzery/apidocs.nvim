@@ -49,42 +49,32 @@ end
 
 local apidocs_open -- forward declaration
 
-local function ensure_install_and_then(languages, cont)
+local function ensure_install_and_then(languages, slugs_to_mtimes, cont)
   local installed_docs = get_installed_docs()
-  local needs_install = {}
+
   for _, source in ipairs(languages) do
     if not vim.tbl_contains(installed_docs, source) then
-      table.insert(needs_install, source)
+      if slugs_to_mtimes == nil then
+        install.fetch_slugs_and_mtimes_and_then(function(slugs_to_mtimes)
+          install.apidoc_install(source, slugs_to_mtimes, function()
+            ensure_install_and_then(languages, slugs_to_mtimes, cont)
+          end)
+        end)
+        return
+      else
+        install.apidoc_install(source, slugs_to_mtimes, function()
+          ensure_install_and_then(languages, slugs_to_mtimes, cont)
+        end)
+        return
+      end
     end
   end
-
-  -- if no items left to install, just call cont()
-  if next(needs_install) == nil then
-    install.fetch_slugs_and_mtimes_and_then(function(slugs_to_mtimes)
-      cont(slugs_to_mtimes)
-    end)
-    return
-  end
-
-  local function call_again()
-    -- gets passed to apidoc_install() so that ensure_install_and_then
-    -- is called again until all languages are installed
-    ensure_install_and_then(languages, cont)
-  end
-
-  -- install first item from needs_install, then call function again
-  local _, to_install = next(needs_install)
-  if slugs_to_mtimes == nil then
-    install.fetch_slugs_and_mtimes_and_then(function(slugs_to_mtimes)
-      install.apidoc_install(to_install, slugs_to_mtimes, call_again)
-    end)
-  else
-    install.apidoc_install(to_install, slugs_to_mtimes, call_again)
-  end
+  -- everything is installed, move on
+  cont(slugs_to_mtimes)
 end
 
 local function ensure_install(languages)
-  ensure_install_and_then(languages, function()
+  ensure_install_and_then(languages, nil, function()
     vim.notify("Apidocs ensure_install complete!")
   end)
 end
@@ -98,7 +88,7 @@ function apidocs_open(opts)
   local installed_docs = get_installed_docs(opts)
 
   if opts and opts.ensure_installed then
-    ensure_install_and_then(opts.ensure_installed, function()
+    ensure_install_and_then(opts.ensure_installed, nil, function()
       -- call apidocs_open() again, but remove ensure_installed from opts
       -- otherwise this would loop infinitely
       local new_opts = { picker = opts.picker }
