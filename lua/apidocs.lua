@@ -47,8 +47,6 @@ local function get_installed_docs(opts)
   return installed_docs
 end
 
-local apidocs_open -- forward declaration
-
 local function ensure_install_and_then(languages, slugs_to_mtimes, cont)
   local installed_docs = get_installed_docs()
 
@@ -79,28 +77,19 @@ local function ensure_install(languages)
   end)
 end
 
-function apidocs_open(opts)
+-- ignore the ensure_installed option, that's handled by apidocs_open
+local function apidocs_open_only()
   local picker = Config.picker
   if opts and opts.picker then
     picker = opts.picker
-  end
-
-  local installed_docs = get_installed_docs(opts)
-
-  if opts and opts.ensure_installed then
-    ensure_install_and_then(opts.ensure_installed, nil, function()
-      -- call apidocs_open() again, but remove ensure_installed from opts
-      -- otherwise this would loop infinitely
-      local new_opts = { picker = opts.picker }
-      apidocs_open(new_opts)
-    end)
-    return
   end
 
   if picker == "snacks" then
     require("apidocs.snacks").apidocs_open(opts)
     return
   end
+
+  local installed_docs = get_installed_docs(opts)
 
   local docs_path = common.data_folder()
   local candidates = {}
@@ -132,6 +121,16 @@ function apidocs_open(opts)
     end)
   else
     require("apidocs.telescope").apidocs_open(opts, slugs_to_mtimes, candidates)
+  end
+end
+
+local function apidocs_open(opts)
+  if opts and opts.ensure_installed then
+    ensure_install_and_then(opts.ensure_installed, nil, function()
+      apidocs_open_only(opts)
+    end)
+  else
+    apidocs_open_only(opts)
   end
 end
 
