@@ -22,16 +22,13 @@ local function set_picker(opts)
   return opts
 end
 
-local function apidocs_open(opts)
-  local picker = Config.picker
-  if opts and opts.picker then
-    picker = opts.picker
-  end
-
+local function get_installed_docs(opts)
   local docs_path = common.data_folder()
   local fs = vim.uv.fs_scandir(docs_path)
-  local candidates = {}
   local installed_docs = {}
+  if fs == nil then
+    return installed_docs
+  end
   while true do
     local name, type = vim.uv.fs_scandir_next(fs)
     if not name then
@@ -47,25 +44,57 @@ local function apidocs_open(opts)
       end
     end
   end
+  return installed_docs
+end
 
-  if opts and opts.ensure_installed then
-    for _, source in ipairs(opts.ensure_installed) do
-      if not vim.tbl_contains(installed_docs, source) then
-        if slugs_to_mtimes == nil then
-          install.fetch_slugs_and_mtimes_and_then(function(slugs_to_mtimes)
-            install.apidoc_install(source, slugs_to_mtimes, function()
-              apidocs_open(opts, slugs_to_mtimes)
-            end)
-          end)
-          return
-        else
+local apidocs_open -- forward declaration
+
+local function ensure_install_and_then(languages, slugs_to_mtimes, cont)
+  local installed_docs = get_installed_docs()
+
+  for _, source in ipairs(languages) do
+    if not vim.tbl_contains(installed_docs, source) then
+      if slugs_to_mtimes == nil then
+        install.fetch_slugs_and_mtimes_and_then(function(slugs_to_mtimes)
           install.apidoc_install(source, slugs_to_mtimes, function()
-            apidocs_open(opts, slugs_to_mtimes)
+            ensure_install_and_then(languages, slugs_to_mtimes, cont)
           end)
-          return
-        end
+        end)
+        return
+      else
+        install.apidoc_install(source, slugs_to_mtimes, function()
+          ensure_install_and_then(languages, slugs_to_mtimes, cont)
+        end)
+        return
       end
     end
+  end
+  -- everything is installed, move on
+  cont(slugs_to_mtimes)
+end
+
+local function ensure_install(languages)
+  ensure_install_and_then(languages, nil, function()
+    vim.notify("Apidocs ensure_install complete!")
+  end)
+end
+
+function apidocs_open(opts)
+  local picker = Config.picker
+  if opts and opts.picker then
+    picker = opts.picker
+  end
+
+  local installed_docs = get_installed_docs(opts)
+
+  if opts and opts.ensure_installed then
+    ensure_install_and_then(opts.ensure_installed, nil, function()
+      -- call apidocs_open() again, but remove ensure_installed from opts
+      -- otherwise this would loop infinitely
+      local new_opts = { picker = opts.picker }
+      apidocs_open(new_opts)
+    end)
+    return
   end
 
   if picker == "snacks" then
@@ -73,6 +102,8 @@ local function apidocs_open(opts)
     return
   end
 
+  local docs_path = common.data_folder()
+  local candidates = {}
   for _, name in ipairs(installed_docs) do
     local fs2 = vim.uv.fs_scandir(docs_path .. "/" .. name)
     while true do
@@ -166,6 +197,7 @@ return {
   apidocs_install = install.apidocs_install,
   apidocs_open = apidocs_open,
   apidocs_search = apidocs_search,
+  ensure_install = ensure_install,
   data_folder = common.data_folder,
   open_doc_in_new_window = common.open_doc_in_new_window,
   open_doc_in_cur_window = common.open_doc_in_cur_window,
