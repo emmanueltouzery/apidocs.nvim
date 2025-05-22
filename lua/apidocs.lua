@@ -39,13 +39,16 @@ local function apidocs_open(opts)
     end
     if type == "directory" then
       if opts and opts.restrict_sources then
-        for _, source in ipairs(opts.restrict_sources) do
-          if vim.tbl_contains(opts.restrict_sources, name) then
-            table.insert(installed_docs, name)
+        if vim.tbl_contains(opts.restrict_sources, name) then
+          table.insert(installed_docs, name)
+        else
           -- no exact match, check for partial match
           -- e.g. "python" -> "python~3.12"
-          elseif name:match("^" .. source .. "~%d+(%.%d+)?$") then
-            table.insert(installed_docs, name)
+          for _, source in ipairs(opts.restrict_sources) do
+            if name:match("^" .. source .. "~%d+(%.%d+)?$") then
+              table.insert(installed_docs, name)
+              break
+            end
           end
         end
       else
