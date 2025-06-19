@@ -104,6 +104,19 @@ local function open_doc_in_new_window(docs_path)
   vim.api.nvim_buf_set_name(0, desc)
 end
 
+-- convert filename to picker display string
+local function filename_to_display(filename)
+  local components = vim.split(filename, "#")
+  local display = components[1]
+  -- little hack: In some languages the filename contains "Class#method", which messes
+  -- up our "#" - separated schema. So if there are 4 "components" in the filename,
+  -- the first two (separated by "#") have to be the actual key to display.
+  if(#components == 4) then
+    display = display .. "#" .. components[2]
+  end
+  return display
+end
+
 
 return {
   data_folder = data_folder,

@@ -101,7 +101,7 @@ local function apidocs_open_only()
         break
       end
       if type2 == "file" and vim.endswith(name2, ".html.md") then
-        local name_no_txt = name2:gsub("#.*$", "")
+        local name_no_txt = common.filename_to_display(name2)
         table.insert(candidates, { display = name .. "/" .. name_no_txt, path = name .. "/" .. name2 })
       end
     end
