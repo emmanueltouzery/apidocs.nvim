@@ -124,4 +124,5 @@ return {
   load_doc_in_buffer = load_doc_in_buffer,
   open_doc_in_cur_window = open_doc_in_cur_window,
   open_doc_in_new_window = open_doc_in_new_window,
+  filename_to_display = filename_to_display,
 }
