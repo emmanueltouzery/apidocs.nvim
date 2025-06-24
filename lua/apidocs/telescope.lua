@@ -86,16 +86,16 @@ local function apidocs_search(opts)
   local default_entry_maker = make_entry.gen_from_vimgrep()
   local function entry_maker(entry)
     local r = default_entry_maker(entry)
-      r.display = function(entry)
-        local entry_components = vim.split(entry.filename:sub(#folder+1), "#")
-        local source_length = entry_components[1]:find("/")
-        local hl_group = {
-          { {0, source_length}, "TelescopeResultsTitle"},
-          { {source_length, #entry_components[1]}, "TelescopeResultsMethod" },
-          { {#entry_components[1], #entry_components[1] + #(tostring(entry.lnum))+2}, "TelescopeResultsLineNr" },
-        }
-        return string.format("%s:%d: %s", entry_components[1], entry.lnum, entry.text), hl_group
-      end
+    r.display = function(entry)
+      local display = common.filename_to_display(entry.filename:sub(#folder+1))
+      local source_length = display:find("/")
+      local hl_group = {
+        { {0, source_length}, "TelescopeResultsTitle"},
+        { {source_length, #display}, "TelescopeResultsMethod" },
+        { {#display, #display + #(tostring(entry.lnum))+2}, "TelescopeResultsLineNr" },
+      }
+      return string.format("%s:%d: %s", display, entry.lnum, entry.text), hl_group
+    end
     return r
   end
 

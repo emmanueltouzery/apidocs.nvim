@@ -58,9 +58,8 @@ local function format_entries(item, picker)
       field = "file",
     },
   }
-  local fileNameParts = vim.split(filename, "#")
   new_item[#new_item + 1] = {
-    fileNameParts[1],
+    common.filename_to_display(filename),
     "SnacksPickerFile",
     field = "file",
   }
