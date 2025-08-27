@@ -162,39 +162,39 @@ local function apidocs_install(opts)
     install.fetch_slugs_and_mtimes_and_then(function (slugs_to_mtimes)
       local keys = vim.tbl_keys(slugs_to_mtimes)
       table.sort(keys)
-      printTable(keys)
+
+      local function entry_maker(entry)
+        return {
+          value = docs_path .. entry.path,
+          ordinal = entry.display,
+          display = entry.display,
+          contents = entry.display,
+        }
+      end
+
+      pickers.new({}, {
+        prompt_title = "API docs install",
+        finder = finders.new_table {
+          results = keys,
+          -- entry_maker = entry_maker
+        },
+        sorter = conf.generic_sorter({}),
+        attach_mappings = function(prompt_bufnr, map)
+          local function on_select()
+            local selection = action_state.get_selected_entry()
+            actions.close(prompt_bufnr)
+            print("You picked: " .. selection[1])
+          end
+
+          map("i", "<CR>", on_select)
+          map("n", "<CR>", on_select)
+          return true
+        end,
+      }):find()
     end)
   end
 
 
-  local function entry_maker(entry)
-    return {
-      value = docs_path .. entry.path,
-      ordinal = entry.display,
-      display = entry.display,
-      contents = entry.display,
-    }
-  end
-
-  -- pickers.new({}, {
-  --   prompt_title = "API docs install",
-  --   finder = finders.new_table {
-  --     results = keys,
-  --     -- entry_maker = entry_maker
-  --   },
-  --   sorter = conf.generic_sorter({}),
-  --   attach_mappings = function(prompt_bufnr, map)
-  --     local function on_select()
-  --       local selection = action_state.get_selected_entry()
-  --       actions.close(prompt_bufnr)
-  --       print("You picked: " .. selection[1])
-  --     end
-  --
-  --     map("i", "<CR>", on_select)
-  --     map("n", "<CR>", on_select)
-  --     return true
-  --   end,
-  -- }):find()
 end
 
 
