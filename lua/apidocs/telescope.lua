@@ -149,7 +149,7 @@ local function apidocs_search(opts)
   })
 end
 
-local function apidocs_install(opts)
+local function apidocs_install()
   local pickers = require "telescope.pickers"
   local finders = require "telescope.finders"
   local action_state = require("telescope.actions.state")
@@ -162,28 +162,17 @@ local function apidocs_install(opts)
     install.fetch_slugs_and_mtimes_and_then(function (slugs_to_mtimes)
       local keys = vim.tbl_keys(slugs_to_mtimes)
       table.sort(keys)
-
-      local function entry_maker(entry)
-        return {
-          value = docs_path .. entry.path,
-          ordinal = entry.display,
-          display = entry.display,
-          contents = entry.display,
-        }
-      end
-
       pickers.new({}, {
         prompt_title = "API docs install",
         finder = finders.new_table {
           results = keys,
-          -- entry_maker = entry_maker
         },
         sorter = conf.generic_sorter({}),
         attach_mappings = function(prompt_bufnr, map)
           local function on_select()
-            local selection = action_state.get_selected_entry()
+            local choice = action_state.get_selected_entry()
             actions.close(prompt_bufnr)
-            print("You picked: " .. selection[1])
+            install.apidoc_install(choice, slugs_to_mtimes)
           end
 
           map("i", "<CR>", on_select)

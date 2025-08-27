@@ -1,5 +1,6 @@
 local common = require("apidocs.common")
 local install = require("apidocs.install")
+local telescope = require("apidocs.telescope")
 
 Config = {}
 
@@ -32,7 +33,6 @@ local function install_treesitter(lang)
     }, true, { err = true })
   end
 end
-
 
 local function ensure_treesitter_dependency()
   local language = vim.treesitter.language
@@ -98,6 +98,30 @@ local function ensure_install(languages)
     vim.notify("Apidocs ensure_install complete!")
   end)
 end
+
+local function apidocs_install(args)
+	if args.nargs == 1 then
+		local installed_docs = get_installed_docs()
+		local to_install = args.fargs[1]
+
+		if not vim.tbl_contains(installed_docs, to_install) then
+			install.fetch_slugs_and_mtimes_and_then(function(slugs_to_mtimes)
+				install.apidoc_install(to_install, slugs_to_mtimes)
+			end)
+			return
+		end
+
+  elseif args.nargs == 0 then
+		if Config.picker == "telescope" then
+			telescope.apidocs_install()
+			return
+		else
+			install.apidocs_install()
+			return
+		end
+	end
+end
+
 
 -- ignore the ensure_installed option, that's handled by apidocs_open
 local function apidocs_open_only()
@@ -184,7 +208,7 @@ local function setup(conf)
 
   ensure_treesitter_dependency()
 
-  vim.api.nvim_create_user_command("ApidocsInstall", install.apidocs_install, {})
+  vim.api.nvim_create_user_command("ApidocsInstall", apidocs_install, {})
   vim.api.nvim_create_user_command("ApidocsOpen", apidocs_open, {})
   vim.api.nvim_create_user_command("ApidocsSearch", apidocs_search, {})
   vim.api.nvim_create_user_command("ApidocsUninstall", function(args)
