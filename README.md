@@ -34,6 +34,7 @@ This plugin requires:
 - ripgrep
 - curl
 - linux and probably OSX. Windows will not work, except maybe using WSL
+- treesitter for html and markdown_inline, easiest way to get them is via [treesitter.nvim](https://github.com/nvim-treesitter/nvim-treesitter) plugin
 
 ## Lazy package manager setup
 
@@ -41,6 +42,7 @@ This plugin requires:
 return {
   'emmanueltouzery/apidocs.nvim',
   dependencies = {
+    'nvim-treesitter/nvim-treesitter',
     'nvim-telescope/telescope.nvim', -- or, 'folke/snacks.nvim'
   },
   cmd = { 'ApidocsSearch', 'ApidocsInstall', 'ApidocsOpen', 'ApidocsSelect', 'ApidocsUninstall' },
