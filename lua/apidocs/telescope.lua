@@ -172,7 +172,7 @@ local function apidocs_install()
           local function on_select()
             local choice = action_state.get_selected_entry()
             actions.close(prompt_bufnr)
-            install.apidoc_install(choice, slugs_to_mtimes)
+            install.apidoc_install(choice[1], slugs_to_mtimes)
           end
 
           map("i", "<CR>", on_select)

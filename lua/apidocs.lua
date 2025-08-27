@@ -28,7 +28,7 @@ local function install_treesitter(lang)
     vim.cmd("TSInstall " .. lang)
   else
     vim.api.nvim_echo({
-      { "treesitter parser for " .. lang .. "is not installed" },
+      { "tree-sitter parser for " .. lang .. "is not installed" },
       { "ApidocsInstall will not work properly until it is" },
     }, true, { err = true })
   end
@@ -100,6 +100,8 @@ local function ensure_install(languages)
 end
 
 local function apidocs_install(args)
+	print("Yes")
+	vim.notify("Correct function called, args: "..args.nargs)
 	if args.nargs == 1 then
 		local installed_docs = get_installed_docs()
 		local to_install = args.fargs[1]
