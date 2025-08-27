@@ -22,6 +22,28 @@ local function set_picker(opts)
   return opts
 end
 
+local function install_treesitter(lang)
+  if package.loaded["nvim-treesitter"] then
+    vim.cmd("TSInstall " .. lang)
+  else
+    vim.api.nvim_echo({
+      { "treesitter parser for " .. lang .. "is not installed" },
+      { "ApidocsInstall will not work properly until it is" },
+    }, true, { err = true })
+  end
+end
+
+
+local function ensure_treesitter_dependency()
+  local language = vim.treesitter.language
+  if not language.add('html') then
+    install_treesitter('html')
+  end
+  if not language.add('markdown_inline') then
+    install_treesitter('markdown_inline')
+  end
+end
+
 local function get_installed_docs(opts)
   local docs_path = common.data_folder()
   local fs = vim.uv.fs_scandir(docs_path)
@@ -159,6 +181,9 @@ end
 
 local function setup(conf)
   set_config(conf)
+
+  ensure_treesitter_dependency()
+
   vim.api.nvim_create_user_command("ApidocsInstall", install.apidocs_install, {})
   vim.api.nvim_create_user_command("ApidocsOpen", apidocs_open, {})
   vim.api.nvim_create_user_command("ApidocsSearch", apidocs_search, {})
