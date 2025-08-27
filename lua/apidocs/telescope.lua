@@ -150,8 +150,8 @@ local function apidocs_search(opts)
 end
 
 local function apidocs_install()
-  local pickers = require "telescope.pickers"
-  local finders = require "telescope.finders"
+  local pickers = require("telescope.pickers")
+  local finders = require("telescope.finders")
   local action_state = require("telescope.actions.state")
   local actions = require("telescope.actions")
   local conf = require("telescope.config").values
@@ -172,6 +172,10 @@ local function apidocs_install()
           local function on_select()
             local choice = action_state.get_selected_entry()
             actions.close(prompt_bufnr)
+
+            if choice == nil then
+              return
+            end
             install.apidoc_install(choice[1], slugs_to_mtimes)
           end
 

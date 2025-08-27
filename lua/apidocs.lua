@@ -1,6 +1,5 @@
 local common = require("apidocs.common")
 local install = require("apidocs.install")
-local telescope = require("apidocs.telescope")
 
 Config = {}
 
@@ -100,9 +99,7 @@ local function ensure_install(languages)
 end
 
 local function apidocs_install(args)
-	print("Yes")
-	vim.notify("Correct function called, args: "..args.nargs)
-	if args.nargs == 1 then
+	if args.nargs and args.nargs == 1 then
 		local installed_docs = get_installed_docs()
 		local to_install = args.fargs[1]
 
@@ -113,9 +110,14 @@ local function apidocs_install(args)
 			return
 		end
 
-  elseif args.nargs == 0 then
+  elseif args.nargs and args.nargs > 1 then
+		vim.notify("Apidocs: too many arguments", vim.log.levels.ERROR)
+	else
 		if Config.picker == "telescope" then
-			telescope.apidocs_install()
+			require("apidocs.telescope").apidocs_install()
+			return
+		elseif Config.picker == "snacks" then
+			require("apidocs.snacks").apidocs_install()
 			return
 		else
 			install.apidocs_install()
@@ -123,7 +125,6 @@ local function apidocs_install(args)
 		end
 	end
 end
-
 
 -- ignore the ensure_installed option, that's handled by apidocs_open
 local function apidocs_open_only()
