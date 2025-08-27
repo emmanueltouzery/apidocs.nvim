@@ -149,7 +149,57 @@ local function apidocs_search(opts)
   })
 end
 
+local function apidocs_install(opts)
+  local pickers = require "telescope.pickers"
+  local finders = require "telescope.finders"
+  local action_state = require("telescope.actions.state")
+  local actions = require("telescope.actions")
+  local conf = require("telescope.config").values
+
+  if vim.fn.executable("elinks") ~= 1 or vim.fn.executable("rg") ~= 1 or vim.fn.executable("find") ~= 1 then
+    print("The 'elinks', 'rg' and 'find' programs must be installed to proceed, refusing to run.")
+  else
+    install.fetch_slugs_and_mtimes_and_then(function (slugs_to_mtimes)
+      local keys = vim.tbl_keys(slugs_to_mtimes)
+      table.sort(keys)
+      printTable(keys)
+    end)
+  end
+
+
+  local function entry_maker(entry)
+    return {
+      value = docs_path .. entry.path,
+      ordinal = entry.display,
+      display = entry.display,
+      contents = entry.display,
+    }
+  end
+
+  -- pickers.new({}, {
+  --   prompt_title = "API docs install",
+  --   finder = finders.new_table {
+  --     results = keys,
+  --     -- entry_maker = entry_maker
+  --   },
+  --   sorter = conf.generic_sorter({}),
+  --   attach_mappings = function(prompt_bufnr, map)
+  --     local function on_select()
+  --       local selection = action_state.get_selected_entry()
+  --       actions.close(prompt_bufnr)
+  --       print("You picked: " .. selection[1])
+  --     end
+  --
+  --     map("i", "<CR>", on_select)
+  --     map("n", "<CR>", on_select)
+  --     return true
+  --   end,
+  -- }):find()
+end
+
+
 return {
   apidocs_open = apidocs_open,
   apidocs_search = apidocs_search,
+  apidocs_install = apidocs_install,
 }
