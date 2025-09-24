@@ -111,7 +111,7 @@ local function filename_to_display(filename)
   -- little hack: In some languages the filename contains "Class#method", which messes
   -- up our "#" - separated schema. So if there are 4 "components" in the filename,
   -- the first two (separated by "#") have to be the actual key to display.
-  if(#components == 4) then
+  if #components == 4 then
     display = display .. "#" .. components[2]
   end
   return display
