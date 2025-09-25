@@ -489,13 +489,16 @@ local function apidoc_install(choice, slugs_to_mtimes, cont)
     local start_elinks = vim.loop.hrtime()
     -- convert the html to text, on 8 processes concurrently (-P8)
     local sysname = vim.loop.os_uname().sysname
-    local sysspecificopts = ""
+    local xargs_cmd = "xargs"
     if sysname == "Darwin" then
-      sysspecificopts = "-S1024 "
+      -- need a larger buffer than default on OSX.
+      -- Also hardcode the path to xargs as a user may install
+      -- the GNU xpath in their path
+      xargs_cmd = "/usr/bin/xargs -S1024"
     end
     vim.system({
       "sh", "-c",
-      [[find . -maxdepth 1 -name '*.html' -print0 | xargs ]] .. sysspecificopts .. [[-0 -P 8 -I param sh -c "elinks -config-dir ]] .. data_folder .. [[ -dump 'param' > 'param'.md && rm 'param'"]]
+      [[find . -maxdepth 1 -name '*.html' -print0 | ]] .. xargs_cmd .. [[ -0 -P 8 -I param sh -c "elinks -config-dir ]] .. data_folder .. [[ -dump 'param' > 'param'.md && rm 'param'"]]
       -- [[find . -maxdepth 1 -name '*.html' -print0 | xargs -0 -P 8 -I param sh -c "elinks -config-dir ]] .. data_folder .. [[ -dump 'param' > 'param'.md"]]
     }, {cwd=target_path}):wait()
     local elapsed_elinks = (vim.loop.hrtime() - start_elinks) / 1e9
