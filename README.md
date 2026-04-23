@@ -36,7 +36,9 @@ This plugin requires:
 - linux and probably OSX. Windows will not work, except maybe using WSL
 - treesitter for html and markdown_inline, easiest way to get them is via [treesitter.nvim](https://github.com/nvim-treesitter/nvim-treesitter) plugin
 
-## Lazy package manager setup
+## Installation
+
+### Lazy.nvim
 
 ```lua
 return {
@@ -51,11 +53,24 @@ return {
     -- Picker will be auto-detected. To select a picker of your choice explicitly you can set picker by the configuration option 'picker':
     -- require('apidocs').setup({picker = "snacks"})
     -- Possible options are 'ui_select', 'telescope', and 'snacks'
+    -- You can change the keymap for following "local://" links by setting the configuration option 'follow_link_keymap':
+    -- require('apidocs').setup({follow_link_keymap = "<C-@>"})
   end,
   keys = {
     { '<leader>sad', '<cmd>ApidocsOpen<cr>', desc = 'Search Api Doc' },
   },
 }
+```
+
+### Vim.pack
+```lua
+vim.schedule(function()
+	vim.pack.add({ "https://github.com/emmanueltouzery/apidocs.nvim" })
+	require("apidocs").setup({
+		picker = "snacks",
+		follow_link_keymap = "<C-@>",
+	})
+end)
 ```
 
 ## Extra screenshots
