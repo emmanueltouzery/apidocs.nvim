@@ -33,14 +33,13 @@ local function install_treesitter(lang)
   end
 end
 
-
 local function ensure_treesitter_dependency()
   local language = vim.treesitter.language
-  if not language.add('html') then
-    install_treesitter('html')
+  if not language.add("html") then
+    install_treesitter("html")
   end
-  if not language.add('markdown_inline') then
-    install_treesitter('markdown_inline')
+  if not language.add("markdown_inline") then
+    install_treesitter("markdown_inline")
   end
 end
 
@@ -176,7 +175,10 @@ local function apidocs_search(opts)
 end
 
 local function set_config(opts)
-  Config = set_picker(opts)
+  opts = set_picker(opts or {})
+  Config = vim.tbl_extend("force", {
+    follow_link_keymap = "<C-]>",
+  }, opts)
 end
 
 local function setup(conf)
