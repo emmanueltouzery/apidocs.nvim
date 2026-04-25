@@ -41,7 +41,7 @@ end
 
 local function open_doc_in_cur_window(docs_path)
   local buf = vim.api.nvim_create_buf(true, false)
-  local lhs = Config and Config.follow_link_keymap or "<C-]>"
+  local follow_link_keymap = Config and Config.follow_link_keymap or "<C-]>"
   vim.api.nvim_win_set_buf(0, buf)
   vim.wo.conceallevel = 2
   vim.wo.concealcursor = "n"
@@ -51,7 +51,7 @@ local function open_doc_in_cur_window(docs_path)
   vim.wo.wrap = false
   vim.bo.modified = false
 
-  vim.keymap.set("n", lhs, function()
+  vim.keymap.set("n", follow_link_keymap, function()
     local line = vim.api.nvim_buf_get_lines(0, vim.fn.line(".") - 1, vim.fn.line("."), false)[1]
     local m = string.match(line, "^%s+%d+%. local://")
     if m == nil and vim.startswith(line, "\tlocal://") then
