@@ -25,7 +25,7 @@ end
 local function buf_view_switch_to_new(new_buf)
   vim.wo.winfixbuf = false
   vim.api.nvim_win_set_buf(0, new_buf)
-  vim.api.nvim_buf_set_option(0, "modifiable", false)
+  vim.api.nvim_set_option_value("modifiable", false, { buf = 0 })
   vim.wo.winfixbuf = true
   vim.wo.wrap = false
   vim.bo.modified = false
@@ -41,17 +41,17 @@ end
 
 local function open_doc_in_cur_window(docs_path)
   local buf = vim.api.nvim_create_buf(true, false)
-  local lhs = Config and Config.follow_link_keymap or "<C-]>"
+  local follow_link_keymap = Config and Config.follow_link_keymap or "<C-]>"
   vim.api.nvim_win_set_buf(0, buf)
   vim.wo.conceallevel = 2
   vim.wo.concealcursor = "n"
   vim.wo.list = false
   load_doc_in_buffer(buf, docs_path)
-  vim.api.nvim_buf_set_option(0, "modifiable", false)
+  vim.api.nvim_set_option_value("modifiable", false, { buf = 0 })
   vim.wo.wrap = false
   vim.bo.modified = false
 
-  vim.keymap.set("n", lhs, function()
+  vim.keymap.set("n", follow_link_keymap, function()
     local line = vim.api.nvim_buf_get_lines(0, vim.fn.line(".") - 1, vim.fn.line("."), false)[1]
     local m = string.match(line, "^%s+%d+%. local://")
     if m == nil and vim.startswith(line, "\tlocal://") then
@@ -90,7 +90,7 @@ local function open_doc_in_cur_window(docs_path)
         vim.cmd("norm! zt | ")
       end
     end
-  end, { buffer = buf })
+  end, { buf = buf })
 end
 
 local function open_doc_in_new_window(docs_path)
