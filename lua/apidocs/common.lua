@@ -4,7 +4,7 @@ end
 
 -- https://stackoverflow.com/a/34953646/516188
 local function escape_pattern(text)
-    return text:gsub("([^%w])", "%%%1")
+  return text:gsub("([^%w])", "%%%1")
 end
 
 local function load_doc_in_buffer(buf, filepath)
@@ -25,7 +25,7 @@ end
 local function buf_view_switch_to_new(new_buf)
   vim.wo.winfixbuf = false
   vim.api.nvim_win_set_buf(0, new_buf)
-  vim.api.nvim_buf_set_option(0, 'modifiable', false)
+  vim.api.nvim_set_option_value("modifiable", false, { buf = 0 })
   vim.wo.winfixbuf = true
   vim.wo.wrap = false
   vim.bo.modified = false
@@ -36,22 +36,23 @@ local function buf_view_switch_to_new(new_buf)
     vim.defer_fn(function()
       vim.wo.winfixbuf = true
     end, 100)
-  end, {buffer = true})
+  end, { buffer = true })
 end
 
 local function open_doc_in_cur_window(docs_path)
   local buf = vim.api.nvim_create_buf(true, false)
+  local follow_link_keymap = Config and Config.follow_link_keymap or "<C-]>"
   vim.api.nvim_win_set_buf(0, buf)
   vim.wo.conceallevel = 2
   vim.wo.concealcursor = "n"
   vim.wo.list = false
   load_doc_in_buffer(buf, docs_path)
-  vim.api.nvim_buf_set_option(0, 'modifiable', false)
+  vim.api.nvim_set_option_value("modifiable", false, { buf = 0 })
   vim.wo.wrap = false
   vim.bo.modified = false
 
-  vim.keymap.set("n", "<C-]>", function()
-    local line = vim.api.nvim_buf_get_lines(0, vim.fn.line(".")-1, vim.fn.line("."), false)[1]
+  vim.keymap.set("n", follow_link_keymap, function()
+    local line = vim.api.nvim_buf_get_lines(0, vim.fn.line(".") - 1, vim.fn.line("."), false)[1]
     local m = string.match(line, "^%s+%d+%. local://")
     if m == nil and vim.startswith(line, "\tlocal://") then
       -- sometimes the format is not "number. link", but "number. desc\n\tlink". maybe when the link has
@@ -61,14 +62,13 @@ local function open_doc_in_cur_window(docs_path)
     if m then
       -- when parsing the local:// url, drop "<tab>+" text at the end,
       -- we add this marker when we can't resolve the ID reference
-      local target = line:sub(#m+1):gsub("\t%+.+$", "")
+      local target = line:sub(#m + 1):gsub("\t%+.+$", "")
       local components = vim.split(target, "#")
       if #components == 2 then
         -- plain file name
         local new_buf = vim.api.nvim_create_buf(true, false)
         load_doc_in_buffer(new_buf, data_folder() .. target .. ".html.md")
         buf_view_switch_to_new(new_buf)
-
       elseif #components == 3 then
         -- file name+section ID
         local new_buf = vim.api.nvim_create_buf(true, false)
@@ -77,18 +77,20 @@ local function open_doc_in_cur_window(docs_path)
         vim.cmd("/" .. components[3])
         -- put the match at the top of the screen, then scroll up one line <C-y>
         vim.cmd("norm! zt | ")
-
       elseif #components == 4 then
         -- file name with two hashes+section ID (happens for lua)
         local new_buf = vim.api.nvim_create_buf(true, false)
-        load_doc_in_buffer(new_buf, data_folder() .. components[1] .. "#" .. components[2] .. "#" .. components[3] .. ".html.md")
+        load_doc_in_buffer(
+          new_buf,
+          data_folder() .. components[1] .. "#" .. components[2] .. "#" .. components[3] .. ".html.md"
+        )
         buf_view_switch_to_new(new_buf)
         vim.cmd("/" .. components[4])
         -- put the match at the top of the screen, then scroll up one line <C-y>
         vim.cmd("norm! zt | ")
       end
     end
-  end, {buffer=true})
+  end, { buf = buf })
 end
 
 local function open_doc_in_new_window(docs_path)
@@ -96,10 +98,10 @@ local function open_doc_in_new_window(docs_path)
   -- conceallevel, and that's tied to the window (not the buffer),
   -- and is very invasive. bufhidden is to enable us to close the window
   -- and have the buffer be closed too -- further tying window & buffer together.
-  vim.cmd[[100vsplit]]
+  vim.cmd([[100vsplit]])
   open_doc_in_cur_window(docs_path)
   vim.wo.winfixbuf = true
-  vim.bo.bufhidden = 'delete'
+  vim.bo.bufhidden = "delete"
   local desc = vim.split(docs_path:match("([^/]+)$"), "#")[1]
   vim.api.nvim_buf_set_name(0, desc)
 end
@@ -116,7 +118,6 @@ local function filename_to_display(filename)
   end
   return display
 end
-
 
 return {
   data_folder = data_folder,
