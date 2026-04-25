@@ -90,7 +90,7 @@ local function open_doc_in_cur_window(docs_path)
         vim.cmd("norm! zt | ")
       end
     end
-  end, { buffer = buf })
+  end, { buf = buf })
 end
 
 local function open_doc_in_new_window(docs_path)
