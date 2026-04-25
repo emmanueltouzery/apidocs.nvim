@@ -25,7 +25,7 @@ end
 local function buf_view_switch_to_new(new_buf)
   vim.wo.winfixbuf = false
   vim.api.nvim_win_set_buf(0, new_buf)
-  vim.api.nvim_buf_set_option(0, "modifiable", false)
+  vim.api.nvim_set_option_value("modifiable", false, { buf = 0 })
   vim.wo.winfixbuf = true
   vim.wo.wrap = false
   vim.bo.modified = false
@@ -47,7 +47,7 @@ local function open_doc_in_cur_window(docs_path)
   vim.wo.concealcursor = "n"
   vim.wo.list = false
   load_doc_in_buffer(buf, docs_path)
-  vim.api.nvim_buf_set_option(0, "modifiable", false)
+  vim.api.nvim_set_option_value("modifiable", false, { buf = 0 })
   vim.wo.wrap = false
   vim.bo.modified = false
 
