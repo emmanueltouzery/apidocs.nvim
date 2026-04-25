@@ -54,7 +54,7 @@ return {
     -- require('apidocs').setup({picker = "snacks"})
     -- Possible options are 'ui_select', 'telescope', and 'snacks'
     -- You can change the keymap for following "local://" links by setting the configuration option 'follow_link_keymap':
-    -- require('apidocs').setup({follow_link_keymap = "<C-@>"})
+    -- require('apidocs').setup({follow_link_keymap = "<C-]>"})
   end,
   keys = {
     { '<leader>sad', '<cmd>ApidocsOpen<cr>', desc = 'Search Api Doc' },
@@ -66,10 +66,7 @@ return {
 ```lua
 vim.schedule(function()
 	vim.pack.add({ "https://github.com/emmanueltouzery/apidocs.nvim" })
-	require("apidocs").setup({
-		picker = "snacks",
-		follow_link_keymap = "<C-@>",
-	})
+	require("apidocs").setup() -- You can check the default configuration and add options to the setup. Check `lazy.nvim` installation for examples
 end)
 ```
 
