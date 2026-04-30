@@ -11,6 +11,13 @@ local function set_picker(opts)
     opts = {}
   end
   if package.loaded["snacks"] then
+    Snacks.picker["apidocs_open"] = function(picker_opts)
+      require('apidocs.snacks').apidocs_open({}, picker_opts)
+    end
+    Snacks.picker["apidocs_search"] = function(picker_opts)
+      require('apidocs.snacks').apidocs_search({}, picker_opts)
+    end
+
     opts.picker = "snacks"
     return opts
   end

@@ -66,30 +66,26 @@ local function format_entries(item, picker)
   return new_item
 end
 
-local function apidocs_open(opts)
-  Snacks.picker.files({
+local function get_picker_opts(opts, picker_opts)
+  local defaults = {
     layout = common_layout_options,
     win = common_win_options,
     dirs = get_data_dirs(opts),
     ft = { "markdown", "md" },
-    confirm = function(picker, item)
+    confirm = function(_, item)
       require("apidocs").open_doc_in_new_window(item.file)
     end,
     format = format_entries,
-  })
+  }
+  return vim.tbl_deep_extend("force", defaults, picker_opts or {})
 end
 
-local function apidocs_search(opts)
-  Snacks.picker.grep({
-    layout = common_layout_options,
-    win = common_win_options,
-    dirs = get_data_dirs(opts),
-    ft = { "markdown", "md" },
-    confirm = function(picker, item)
-      require("apidocs").open_doc_in_new_window(item.file)
-    end,
-    format = format_entries,
-  })
+local function apidocs_open(opts, picker_opts)
+  Snacks.picker.files(get_picker_opts(opts, picker_opts))
+end
+
+local function apidocs_search(opts, picker_opts)
+  Snacks.picker.grep(get_picker_opts(opts, picker_opts))
 end
 
 return {
