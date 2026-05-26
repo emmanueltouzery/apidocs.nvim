@@ -40,7 +40,7 @@ local function buf_view_switch_to_new(new_buf)
 end
 
 local function open_doc_in_cur_window(docs_path)
-  local buf = vim.api.nvim_create_buf(true, false)
+  local buf = vim.api.nvim_create_buf(false, true) -- unlisted, scratch
   local follow_link_keymap = Config and Config.follow_link_keymap or "<C-]>"
   vim.api.nvim_win_set_buf(0, buf)
   vim.wo.conceallevel = 2
