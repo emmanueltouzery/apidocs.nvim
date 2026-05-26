@@ -4,7 +4,13 @@ local install = require("apidocs.install")
 Config = {}
 
 local function set_picker(opts)
-  if opts and (opts.picker == "snacks" or opts.picker == "telescope" or opts.picker == "ui_select") then
+  if opts and (
+      opts.picker == "snacks"
+      or opts.picker == "telescope"
+      or opts.picker == "mini.pick"
+      or opts.picker == "ui_select"
+    )
+  then
     return opts
   end
   if not opts then
@@ -16,6 +22,10 @@ local function set_picker(opts)
   end
   if package.loaded["telescope"] then
     opts.picker = "telescope"
+    return opts
+  end
+  if package.loaded["mini.pick"] then
+    opts.picker = "mini.pick"
     return opts
   end
   opts.picker = "ui_select"
@@ -35,11 +45,11 @@ end
 
 local function ensure_treesitter_dependency()
   local language = vim.treesitter.language
-  if not language.add("html") then
-    install_treesitter("html")
+  if not language.add('html') then
+    install_treesitter('html')
   end
-  if not language.add("markdown_inline") then
-    install_treesitter("markdown_inline")
+  if not language.add('markdown_inline') then
+    install_treesitter('markdown_inline')
   end
 end
 
@@ -110,6 +120,11 @@ local function apidocs_open_only()
     return
   end
 
+  if picker == "mini.pick" then
+    require("apidocs.mini_pick").apidocs_open(opts)
+    return
+  end
+
   local installed_docs = get_installed_docs(opts)
 
   local docs_path = common.data_folder()
@@ -170,6 +185,10 @@ local function apidocs_search(opts)
   end
   if picker == "telescope" then
     require("apidocs.telescope").apidocs_search(opts)
+    return
+  end
+  if picker == "mini.pick" then
+    require("apidocs.mini_pick").apidocs_search(opts)
     return
   end
 end
