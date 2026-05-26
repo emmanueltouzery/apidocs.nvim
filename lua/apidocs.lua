@@ -99,7 +99,7 @@ local function ensure_install(languages)
 end
 
 -- ignore the ensure_installed option, that's handled by apidocs_open
-local function apidocs_open_only()
+local function apidocs_open_only(opts)
   local picker = Config.picker
   if opts and opts.picker then
     picker = opts.picker
