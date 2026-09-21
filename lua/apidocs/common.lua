@@ -7,6 +7,14 @@ local function escape_pattern(text)
   return text:gsub("([^%w])", "%%%1")
 end
 
+-- The "Visible links" footer elinks appends to each page lists local links in
+-- two shapes: "   3. local://…", or, when the link has a description on the line
+-- before (rust does this), "\tlocal://…". Returns the matched prefix, or nil.
+-- Following a link and filtering search results both rely on it.
+local function link_footer_prefix(line)
+  return string.match(line, "^%s+%d+%. local://") or string.match(line, "^\tlocal://")
+end
+
 local function load_doc_in_buffer(buf, filepath)
   if vim.fn.filereadable(filepath) == 1 then
     local lines = {}
@@ -53,12 +61,7 @@ local function open_doc_in_cur_window(docs_path)
 
   vim.keymap.set("n", follow_link_keymap, function()
     local line = vim.api.nvim_buf_get_lines(0, vim.fn.line(".") - 1, vim.fn.line("."), false)[1]
-    local m = string.match(line, "^%s+%d+%. local://")
-    if m == nil and vim.startswith(line, "\tlocal://") then
-      -- sometimes the format is not "number. link", but "number. desc\n\tlink". maybe when the link has
-      -- a description? this happens with rust
-      m = string.match(line, "^\tlocal://")
-    end
+    local m = link_footer_prefix(line)
     if m then
       -- when parsing the local:// url, drop "<tab>+" text at the end,
       -- we add this marker when we can't resolve the ID reference
@@ -122,6 +125,7 @@ end
 return {
   data_folder = data_folder,
   escape_pattern = escape_pattern,
+  link_footer_prefix = link_footer_prefix,
   load_doc_in_buffer = load_doc_in_buffer,
   open_doc_in_cur_window = open_doc_in_cur_window,
   open_doc_in_new_window = open_doc_in_new_window,

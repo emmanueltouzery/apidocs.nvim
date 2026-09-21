@@ -86,6 +86,10 @@ local function apidocs_search(opts)
   local default_entry_maker = make_entry.gen_from_vimgrep()
   local function entry_maker(entry)
     local r = default_entry_maker(entry)
+    -- a match in a page's link footer is a link to the term, not a mention of it
+    if r == nil or common.link_footer_prefix(r.text) then
+      return nil
+    end
     r.display = function(entry)
       local display = common.filename_to_display(entry.filename:sub(#folder+1))
       local source_length = display:find("/")

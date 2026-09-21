@@ -1,4 +1,5 @@
 local common = require("apidocs.common")
+local sections = require("apidocs.sections")
 
 local function fetch_slugs_and_mtimes_and_then(cont)
   vim.system({"curl", "-L", "https://devdocs.io/docs.json"}, {text=true}, vim.schedule_wrap(function(res)
@@ -539,6 +540,9 @@ local function apidoc_install(choice, slugs_to_mtimes, cont)
           end
         end
       end
+
+      -- section files repeat their page's text: keep them out of searches
+      sections.write(target_path, vim.tbl_keys(out_path_to_orig_containing_path))
 
       local elapsed_pp = (vim.loop.hrtime() - start_pp) / 1e9
 

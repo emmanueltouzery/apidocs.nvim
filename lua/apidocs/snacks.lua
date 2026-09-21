@@ -77,6 +77,17 @@ local function format_entries(item, picker)
   return new_item
 end
 
+-- A grep match inside a page's "Visible links" footer is a link to the thing
+-- searched for, not a mention of it: every page linking to RidgeCV would list
+-- one (147 of 258 scikit_learn hits). At this point item.text is
+-- "file:line:col:text".
+local function drop_link_footer_matches(item)
+  local text = item.text:sub(#item.file + 2):match("^%d+:%d+:(.*)$")
+  if text and common.link_footer_prefix(text) then
+    return false
+  end
+end
+
 local function apidocs_open(opts)
   Snacks.picker.files({
     layout = get_layout(opts),
@@ -96,6 +107,7 @@ local function apidocs_search(opts)
     win = common_win_options,
     dirs = get_data_dirs(opts),
     ft = { "markdown", "md" },
+    transform = drop_link_footer_matches,
     confirm = function(picker, item)
       require("apidocs").open_doc_in_new_window(item.file)
     end,
@@ -106,4 +118,5 @@ end
 return {
   apidocs_open = apidocs_open,
   apidocs_search = apidocs_search,
+  drop_link_footer_matches = drop_link_footer_matches,
 }
