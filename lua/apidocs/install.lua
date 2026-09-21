@@ -136,8 +136,10 @@ local function fix_file_links(fname, lines, target_path, choice, path_to_name,
     name_and_id_to_string_nearby, orig_path, orig_containing_path)
   local changes = false
   for i = #lines, 1, -1 do
-    local l, m = lines[i]:match("^( +%d+%. )(.*)$")
-    if m == nil and i > 1 and lines[i-1]:match("^ +%d+%. .*$") and vim.startswith(lines[i], "\t") then
+    -- elinks right-aligns link numbers to four columns, so from 1000 on there is
+    -- no leading space
+    local l, m = lines[i]:match("^( *%d+%. )(.*)$")
+    if m == nil and i > 1 and lines[i-1]:match("^ *%d+%. .*$") and vim.startswith(lines[i], "\t") then
       -- sometimes the format is not "number. link", but "number. desc\n\tlink". maybe when the link has
       -- a description? this happens with rust
       l, m = lines[i]:match("^(\t)(.*)$")
