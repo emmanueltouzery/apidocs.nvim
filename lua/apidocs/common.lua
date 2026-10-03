@@ -2,6 +2,17 @@ local function data_folder()
   return vim.fn.stdpath("data") .. "/apidocs-data/"
 end
 
+local function get_data_dirs(opts)
+  local data_dir = data_folder()
+  if not (opts and opts.restrict_sources) then return { data_dir } end
+  local dirs = {}
+  for _, source in ipairs(opts.restrict_sources) do
+    local dir = data_dir .. source .. "/"
+    if vim.fn.isdirectory(dir) == 1 then table.insert(dirs, dir) end
+  end
+  return dirs
+end
+
 -- https://stackoverflow.com/a/34953646/516188
 local function escape_pattern(text)
   return text:gsub("([^%w])", "%%%1")
@@ -121,6 +132,7 @@ end
 
 return {
   data_folder = data_folder,
+  get_data_dirs = get_data_dirs,
   escape_pattern = escape_pattern,
   load_doc_in_buffer = load_doc_in_buffer,
   open_doc_in_cur_window = open_doc_in_cur_window,
