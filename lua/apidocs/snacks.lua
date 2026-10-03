@@ -20,6 +20,32 @@ local common_win_options = {
   },
 }
 
+-- The layout comes from the call's opts, then from setup(), then the default.
+-- A string is a snacks layout preset name ("ivy_split", "vertical"...), a table
+-- is a full snacks layout config.
+local function get_layout(opts)
+  local layout = (opts and opts.layout) or (Config and Config.layout)
+  if type(layout) == "string" then
+    return { preset = layout }
+  end
+  return layout or common_layout_options
+end
+
+local function get_data_dirs(opts)
+  local data_dir = common.data_folder()
+  if not (opts and opts.restrict_sources) then
+    return { data_dir }
+  end
+  local dirs = {}
+  for _, source in ipairs(opts.restrict_sources) do
+    local dir = data_dir .. source .. "/"
+    if vim.fn.isdirectory(dir) == 1 then
+      table.insert(dirs, dir)
+    end
+  end
+  return dirs
+end
+
 local function format_entries(item, picker)
   local parts = vim.split(item.file, "/")
   -- take the last part and set it as the text
@@ -53,9 +79,9 @@ end
 
 local function apidocs_open(opts)
   Snacks.picker.files({
-    layout = common_layout_options,
+    layout = get_layout(opts),
     win = common_win_options,
-    dirs = common.get_data_dirs(opts),
+    dirs = get_data_dirs(opts),
     ft = { "markdown", "md" },
     confirm = function(picker, item)
       require("apidocs").open_doc_in_new_window(item.file)
@@ -66,9 +92,9 @@ end
 
 local function apidocs_search(opts)
   Snacks.picker.grep({
-    layout = common_layout_options,
+    layout = get_layout(opts),
     win = common_win_options,
-    dirs = common.get_data_dirs(opts),
+    dirs = get_data_dirs(opts),
     ft = { "markdown", "md" },
     confirm = function(picker, item)
       require("apidocs").open_doc_in_new_window(item.file)

@@ -14,8 +14,8 @@ Call `require("apidocs").setup()` when installing the plugin to register the com
 The plugin exports the following commands:
 
 - `ApidocsInstall` - will fetch the list of supported documentation sources (lua, openjdk, rust...) from devdocs.io and ask you which one you wish to install. Note that downloading+installing can take over a minute and WILL TEMPORARILY FREEZE YOUR NEOVIM. This is because the plugin leverages neovim's tree-sitter to post-process the files. This happens only when installing a source, and never again after that.
-- `ApidocsOpen` (requires telescope.nvim, snacks.nvim, or mini.pick) - open a picker listing all apidocs. If you want to display only a subset of sources, call the lua function: `:lua require("apidocs").apidocs_open({restrict_sources={"rust"}})`
-- `ApidocsSearch` (requires telescope.nvim, snacks.nvim, or mini.pick) - open a picker to grep for text in all apidocs. If you want to display only a subset of sources, call the lua function: `:lua require("apidocs").apidocs_search({restrict_sources={"rust"}})`
+- `ApidocsOpen` (requires telescope.nvim, snacks.nvim, or mini.pick) - open a picker listing all apidocs. If you want to display only a subset of sources, call the lua function: `:lua require("apidocs").apidocs_open({restrict_sources={"rust"}})`. With snacks you can also pick the picker layout: `:lua require("apidocs").apidocs_open({layout="ivy_split"})`
+- `ApidocsSearch` (requires telescope.nvim, snacks.nvim, or mini.pick) - open a picker to grep for text in all apidocs. If you want to display only a subset of sources, call the lua function: `:lua require("apidocs").apidocs_search({restrict_sources={"rust"}})`. The `layout` option works here too.
 - `ApidocsUninstall` - allows to uninstall sources. Press tab to get a completion on the available ones.
 
 ## Advanced usage
@@ -53,7 +53,9 @@ return {
     require('apidocs').setup()
     -- Picker will be auto-detected. To select a picker of your choice explicitly you can set picker by the configuration option 'picker':
     -- require('apidocs').setup({picker = "snacks"})
-    -- Possible options are 'ui_select', 'telescope', 'snacks', and 'mini.pick'
+    -- Possible options are 'ui_select', 'telescope', and 'snacks'
+    -- With snacks, the picker layout defaults to the "telescope" preset. Any snacks layout preset name or layout table works:
+    -- require('apidocs').setup({picker = "snacks", layout = "ivy_split"})
     -- You can change the keymap for following "local://" links by setting the configuration option 'follow_link_keymap' (default is "<C-]>"):
     -- require('apidocs').setup({follow_link_keymap = "<C-]>"})
   end,
